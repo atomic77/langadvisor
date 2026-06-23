@@ -14,8 +14,10 @@ import pytest
 import pytest_asyncio
 
 from core.history_store import HistoryEntry, HistoryStore
-from core.llm import check_grammar, get_feedback_and_suggestion, get_llm
+from core.llm import check_grammar, get_feedback_and_suggestion, get_llm, set_default_model
 from core.model_fetcher import fetch_ollama_models
+from ui.assessment_panel import AssessmentPanel
+from ui.practice_panel import PracticePanel
 from ui.sidebar import Sidebar
 
 
@@ -25,6 +27,7 @@ def reset_llm_globals():
     import core.llm as llm_mod
     llm_mod._llm = None
     llm_mod._current_model = None
+    llm_mod._default_model = None
 
 
 # ---------------------------------------------------------------------------
@@ -257,3 +260,47 @@ class TestSidebarSearch:
         assert len(results) == 0
 
 
+
+class TestLlmDefaultModel:
+    @patch("core.llm.ChatOllama")
+    def test_uses_default_model_when_input_model_empty(self, mock_cls):
+        mock_cls.return_value = MagicMock()
+        set_default_model("llama3")
+        get_llm("")
+        mock_cls.assert_called_once_with(model="llama3", temperature=0)
+
+    def test_raises_when_no_model_available(self):
+        with pytest.raises(ValueError):
+            get_llm("")
+
+
+class TestLanguageDropdownConfiguration:
+    def test_assessment_panel_set_languages_keeps_existing_selection(self):
+        panel = AssessmentPanel(on_assess_click=None, on_text_change=None, on_keyboard=None)
+        panel.selected_language = "French"
+
+        panel.set_languages(["English", "French", "German"])
+
+        assert panel.selected_language == "French"
+        assert [opt.key for opt in panel._lang_dropdown.options] == [
+            "English",
+            "French",
+            "German",
+        ]
+
+    def test_assessment_panel_set_languages_falls_back_to_first(self):
+        panel = AssessmentPanel(on_assess_click=None, on_text_change=None, on_keyboard=None)
+        panel.selected_language = "Japanese"
+
+        panel.set_languages(["English", "German"])
+
+        assert panel.selected_language == "English"
+
+    def test_practice_panel_set_languages_falls_back_to_first(self):
+        panel = PracticePanel()
+        panel._lang_dropdown.value = "Japanese"
+
+        panel.set_languages(["Spanish", "Italian"])
+
+        assert panel.selected_language == "Spanish"
+        assert [opt.key for opt in panel._lang_dropdown.options] == ["Spanish", "Italian"]

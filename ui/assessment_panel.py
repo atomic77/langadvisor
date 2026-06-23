@@ -2,6 +2,11 @@
 
 import flet as ft
 
+from core.languages import DEFAULT_ENABLED_LANGUAGES
+
+TEXTFIELD_BORDER_COLOR = ft.Colors.OUTLINE
+TEXTFIELD_FOCUSED_BORDER_COLOR = ft.Colors.PRIMARY
+
 
 class AssessmentPanel:
     """Encapsulates the text input, controls, and result displays."""
@@ -11,13 +16,7 @@ class AssessmentPanel:
             label="Language",
             width=150,
             value="Serbian",
-            options=[
-                ft.dropdown.Option("English", "English"),
-                ft.dropdown.Option("Serbian", "Serbian"),
-                ft.dropdown.Option("Italian", "Italian"),
-                ft.dropdown.Option("French", "French"),
-                ft.dropdown.Option("Japanese", "Japanese"),
-            ],
+            options=[ft.dropdown.Option(lang, lang) for lang in DEFAULT_ENABLED_LANGUAGES],
         )
         self._formality_dropdown = ft.Dropdown(
             label="Formality",
@@ -29,10 +28,6 @@ class AssessmentPanel:
                 ft.dropdown.Option("Formal", "Formal"),
             ],
         )
-        self._model_status = ft.Text(
-            value="Loading models…", size=11, color=ft.Colors.GREY
-        )
-        self._model_dropdown = ft.Dropdown(label="Model", width=250)
         self._assess_btn = ft.Button("Assess", icon="CHECK", width=130)
         self._assessing_indicator = ft.ProgressRing(
             width=20, height=20, visible=False, stroke_width=2
@@ -59,8 +54,10 @@ class AssessmentPanel:
             width=580,
             read_only=True,
             visible=False,
-            border_color=ft.Colors.GREEN_200,
-            focused_border_color=ft.Colors.GREEN_400,
+            border_color=TEXTFIELD_BORDER_COLOR,
+            focused_border_color=TEXTFIELD_FOCUSED_BORDER_COLOR,
+            border_width=1.2,
+            focused_border_width=1.8,
         )
 
         self._txt_input = ft.TextField(
@@ -72,6 +69,10 @@ class AssessmentPanel:
             width=580,
             text_size=14,
             on_change=on_text_change,
+            border_color=TEXTFIELD_BORDER_COLOR,
+            focused_border_color=TEXTFIELD_FOCUSED_BORDER_COLOR,
+            border_width=1.2,
+            focused_border_width=1.8,
         )
 
         self._assess_btn.on_click = on_assess_click
@@ -87,8 +88,6 @@ class AssessmentPanel:
                 ),
                 ft.Row(
                     controls=[
-                        self._model_dropdown,
-                        self._model_status,
                         self._assess_btn,
                         self._assessing_indicator,
                     ],
@@ -132,25 +131,8 @@ class AssessmentPanel:
 
     @property
     def selected_model(self) -> str:
-        return self._model_dropdown.value or ""
-
-    @selected_model.setter
-    def selected_model(self, value: str) -> None:
-        self._model_dropdown.value = value
-
-    # -- model status --
-
-    def set_model_status(self, message: str, is_error: bool = False) -> None:
-        self._model_status.value = message
-        self._model_status.color = ft.Colors.RED if is_error else ft.Colors.GREY
-
-    def hide_model_status(self) -> None:
-        self._model_status.visible = False
-
-    def set_models(self, names: list[str]) -> None:
-        self._model_dropdown.options = [ft.dropdown.Option(n) for n in names]
-        if names:
-            self._model_dropdown.value = names[0]
+        # Model selection now comes from Settings (global default).
+        return ""
 
     # -- assessment state --
 
@@ -166,6 +148,17 @@ class AssessmentPanel:
 
     def disable_assess_button(self) -> None:
         self._assess_btn.disabled = True
+
+    def set_languages(self, languages: list[str]) -> None:
+        """Replace available languages and keep a valid selected value."""
+        current = self._lang_dropdown.value
+        self._lang_dropdown.options = [ft.dropdown.Option(lang, lang) for lang in languages]
+        if current in languages:
+            self._lang_dropdown.value = current
+        elif languages:
+            self._lang_dropdown.value = languages[0]
+        else:
+            self._lang_dropdown.value = None
 
     # -- results --
 

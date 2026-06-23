@@ -1,11 +1,19 @@
 """Tests for SQLite persistence layer."""
 
-from pathlib import Path
-
 import pytest
 
 from core.history_store import HistoryEntry
-from core.persistence import load_entries, save_entry
+from core.languages import DEFAULT_ENABLED_LANGUAGES
+from core.persistence import (
+    load_default_model,
+    load_enabled_languages,
+    load_entries,
+    load_setting,
+    save_default_model,
+    save_enabled_languages,
+    save_entry,
+    save_setting,
+)
 
 
 @pytest.fixture
@@ -34,8 +42,17 @@ class TestPersistence:
         assert entries[0].verdict == "yes"
 
     def test_load_order_is_newest_first(self, temp_db):
-        e1 = HistoryEntry(text="First", language="L", formality="F", model="m", verdict="yes")
-        e2 = HistoryEntry(text="Second", language="L", formality="F", model="m", verdict="no", feedback="bad")
+        e1 = HistoryEntry(
+            text="First", language="L", formality="F", model="m", verdict="yes"
+        )
+        e2 = HistoryEntry(
+            text="Second",
+            language="L",
+            formality="F",
+            model="m",
+            verdict="no",
+            feedback="bad",
+        )
         save_entry(e1, temp_db)
         save_entry(e2, temp_db)
         entries = load_entries(temp_db)
@@ -47,3 +64,27 @@ class TestPersistence:
         entries = load_entries(temp_db)
         assert entries[0].feedback == ""
         assert entries[0].suggestion == ""
+
+    def test_save_and_load_generic_setting(self, temp_db):
+        save_setting("theme", "dark", temp_db)
+        assert load_setting("theme", temp_db) == "dark"
+
+    def test_save_setting_overwrites_previous_value(self, temp_db):
+        save_setting("theme", "dark", temp_db)
+        save_setting("theme", "light", temp_db)
+        assert load_setting("theme", temp_db) == "light"
+
+    def test_save_and_load_default_model(self, temp_db):
+        save_default_model("llama3.2", temp_db)
+        assert load_default_model(temp_db) == "llama3.2"
+
+    def test_save_and_load_enabled_languages(self, temp_db):
+        save_enabled_languages(["English", "Spanish", "Japanese"], temp_db)
+        assert load_enabled_languages(temp_db) == ["English", "Spanish", "Japanese"]
+
+    def test_enabled_languages_defaults_when_missing(self, temp_db):
+        assert load_enabled_languages(temp_db) == DEFAULT_ENABLED_LANGUAGES
+
+    def test_enabled_languages_defaults_when_corrupt(self, temp_db):
+        save_setting("enabled_languages", "{not-json", temp_db)
+        assert load_enabled_languages(temp_db) == DEFAULT_ENABLED_LANGUAGES

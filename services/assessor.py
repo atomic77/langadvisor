@@ -3,7 +3,7 @@
 import asyncio
 
 from core.history_store import HistoryEntry, HistoryStore
-from core.llm import check_grammar
+from core.llm import check_grammar, get_default_model
 
 
 class AssessorService:
@@ -32,13 +32,16 @@ class AssessorService:
         self._panel.clear_results()
         self._page.update()
 
+        selected_model = self._panel.selected_model
+        effective_model = selected_model or (get_default_model() or "")
+
         self._running_task = asyncio.current_task()
         try:
             verdict, feedback, suggestion = await check_grammar(
                 text,
                 self._panel.selected_language,
                 self._panel.selected_formality,
-                self._panel.selected_model,
+                selected_model,
             )
 
             if verdict in ("yes", "no"):
@@ -55,7 +58,7 @@ class AssessorService:
                     text=text,
                     language=self._panel.selected_language,
                     formality=self._panel.selected_formality,
-                    model=self._panel.selected_model,
+                    model=effective_model,
                     verdict=verdict,
                     feedback=feedback,
                     suggestion=suggestion,
