@@ -1,0 +1,27 @@
+[project]
+name = "langadvisor"
+version = "0.1.0"
+description = "A Flet GUI app for grammar assessment using local LLMs via Ollama."
+requires-python = ">=3.10"
+dependencies = [
+    "flet",
+    "langchain-ollama",
+    "pillow>=12.2.0",
+    "platformdirs>=4.10.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["core", "ui", "services"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.0",
+    "pytest-asyncio>=1.4.0",
+]
