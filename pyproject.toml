@@ -1,10 +1,11 @@
 [project]
 name = "langadvisor"
 version = "0.1.0"
-description = "A Flet GUI app for grammar assessment using local LLMs via Ollama."
+description = "A Flet GUI app for grammar assessment and practice using local LLMs via Ollama."
 requires-python = ">=3.10"
 dependencies = [
     "flet",
+    "flet-desktop>=0.85.3",
     "langchain-ollama",
     "pillow>=12.2.0",
     "platformdirs>=4.10.0",

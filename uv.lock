@@ -186,6 +186,18 @@ wheels = [
 ]
 
 [[package]]
+name = "flet-desktop"
+version = "0.85.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "flet" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a6/3f/1e37e210335475616e038bb773b22463744c2ca6985b9a6e913d3a57a472/flet_desktop-0.85.3.tar.gz", hash = "sha256:94c1c467bc65e291a403ed2e5b5a177d7d937bbc233b8579396cdc5704be32c7", size = 6091, upload-time = "2026-06-08T01:56:44.655Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/5d/bd/d18714ef81abec2286cfb9092dc5bddfacf014761a565864c6223d84ec62/flet_desktop-0.85.3-py3-none-any.whl", hash = "sha256:fcfb9edaf328414e4b8d27d953b92ab9f6b97b0587b3e36afaf34877f0740de2", size = 6177, upload-time = "2026-06-08T01:56:45.412Z" },
+]
+
+[[package]]
 name = "h11"
 version = "0.16.0"
 source = { registry = "https://pypi.org/simple" }
@@ -267,6 +279,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "flet" },
+    { name = "flet-desktop" },
     { name = "langchain-ollama" },
     { name = "pillow" },
     { name = "platformdirs" },
@@ -286,6 +299,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "flet" },
+    { name = "flet-desktop", specifier = ">=0.85.3" },
     { name = "langchain-ollama" },
     { name = "pillow", specifier = ">=12.2.0" },
     { name = "platformdirs", specifier = ">=4.10.0" },

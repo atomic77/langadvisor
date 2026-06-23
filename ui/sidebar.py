@@ -6,19 +6,22 @@ from core.history_store import HistoryStore
 
 
 class Sidebar:
-    """Collapsible sidebar containing new/search buttons and history."""
+    """Collapsible sidebar containing navigation, search, and history."""
 
     def __init__(
         self,
         store: HistoryStore,
         on_new: callable,
         on_load: callable,
+        on_mode_change: callable = None,
     ):
         self._store = store
         self._on_new = on_new
         self._on_load = on_load
+        self._on_mode_change = on_mode_change
         self._store.on_change(self._rebuild_history_list)
         self._search_query = ""
+        self._mode = "grammar"  # "grammar", "practice", or "settings"
 
         self._theme_btn_collapsed = ft.IconButton(
             icon=ft.icons.Icons.DARK_MODE,
@@ -62,6 +65,18 @@ class Sidebar:
                         tooltip="Search",
                         on_click=lambda e: self._toggle_search(e),
                     ),
+                    ft.IconButton(
+                        icon=ft.icons.Icons.SCHOOL,
+                        icon_size=22,
+                        tooltip="Practice",
+                        on_click=lambda e: self._set_mode("practice"),
+                    ),
+                    ft.IconButton(
+                        icon=ft.icons.Icons.SETTINGS,
+                        icon_size=22,
+                        tooltip="Settings",
+                        on_click=lambda e: self._set_mode("settings"),
+                    ),
                     ft.Container(height=4),
                     self._theme_btn_collapsed,
                 ],
@@ -72,7 +87,7 @@ class Sidebar:
             bgcolor=ft.Colors.SURFACE_CONTAINER_LOW,
             border_radius=8,
             padding=8,
-            visible=True,
+            visible=False,
         )
 
         header = ft.Container(
@@ -96,7 +111,19 @@ class Sidebar:
             content=ft.Row(
                 [ft.Icon(ft.icons.Icons.ADD, size=16), ft.Text("New Assessment", size=13)]
             ),
-            on_click=lambda e: self._on_new(),
+            on_click=lambda e: self._set_mode("grammar") or self._on_new(),
+        )
+        self._practice_link = ft.TextButton(
+            content=ft.Row(
+                [ft.Icon(ft.icons.Icons.SCHOOL, size=16), ft.Text("Practice", size=13)]
+            ),
+            on_click=lambda e: self._set_mode("practice"),
+        )
+        self._settings_link = ft.TextButton(
+            content=ft.Row(
+                [ft.Icon(ft.icons.Icons.SETTINGS, size=16), ft.Text("Settings", size=13)]
+            ),
+            on_click=lambda e: self._set_mode("settings"),
         )
         search_btn = ft.TextButton(
             content=ft.Row(
@@ -110,19 +137,47 @@ class Sidebar:
             on_change=lambda e: self._apply_search(e.control.value),
             visible=False,
             dense=True,
+            border_color=ft.Colors.OUTLINE,
+            focused_border_color=ft.Colors.PRIMARY,
+            border_width=1.2,
+            focused_border_width=1.8,
         )
         divider = ft.Divider(height=1, color=ft.Colors.OUTLINE_VARIANT)
-        history_header = ft.Text("History", size=13, weight=ft.FontWeight.W_600)
+        self._history_header = ft.Text("History", size=13, weight=ft.FontWeight.W_600)
+
+        self._practice_stats = ft.Column(
+            controls=[
+                ft.Text("🔥 Streak: 0", size=12),
+                ft.Text("Session: 0 correct", size=11, color=ft.Colors.GREY),
+                ft.Text("Total completed: 0", size=11, color=ft.Colors.GREY),
+            ],
+            spacing=4,
+            visible=False,
+        )
+        self._practice_topics = ft.Column(
+            controls=[
+                self._make_topic_btn("Grammar Rules", "📝"),
+                self._make_topic_btn("Verb Tenses", "🔄"),
+                self._make_topic_btn("Prepositions", "📍"),
+                self._make_topic_btn("Articles", "🔤"),
+            ],
+            spacing=6,
+            visible=False,
+        )
 
         self._expanded = ft.Container(
             content=ft.Column(
                 controls=[
                     header,
                     new_btn,
+                    self._practice_link,
+                    self._settings_link,
                     search_btn,
                     self._search_input,
                     divider,
-                    history_header,
+                    self._history_header,
+                    self._practice_stats,
+                    self._practice_topics,
                     self._history_list,
                 ],
                 spacing=6,
@@ -131,7 +186,7 @@ class Sidebar:
             bgcolor=ft.Colors.SURFACE_CONTAINER_LOW,
             border_radius=8,
             padding=10,
-            visible=False,
+            visible=True,
         )
 
         self.view = ft.Row(
@@ -140,8 +195,46 @@ class Sidebar:
             vertical_alignment=ft.CrossAxisAlignment.START,
         )
 
-        # Populate the list from any pre-loaded store entries (e.g. from disk).
         self._rebuild_history_list()
+
+    def _make_topic_btn(self, label: str, emoji: str) -> ft.Container:
+        return ft.Container(
+            content=ft.Text(f"{emoji}  {label}", size=12),
+            border=ft.Border.all(1, ft.Colors.OUTLINE),
+            border_radius=5,
+            padding=ft.padding.Padding(left=8, top=6, right=8, bottom=6),
+            ink=True,
+        )
+
+    def _set_mode(self, mode: str) -> None:
+        """Switch between 'grammar', 'practice', and 'settings' mode."""
+        if self._mode == mode:
+            return
+        self._mode = mode
+        self._update_contextual_content()
+        if self._on_mode_change:
+            self._on_mode_change(mode)
+
+    def _update_contextual_content(self) -> None:
+        """Show contextual sidebar content for the active mode."""
+        if self._mode == "practice":
+            self._history_header.value = "Practice"
+            self._history_list.visible = False
+            self._practice_stats.visible = False
+            self._practice_topics.visible = False
+            self._search_input.visible = False
+        elif self._mode == "settings":
+            self._history_header.value = "Settings"
+            self._history_list.visible = False
+            self._practice_stats.visible = False
+            self._practice_topics.visible = False
+            self._search_input.visible = False
+        else:
+            self._history_header.value = "History"
+            self._history_list.visible = True
+            self._practice_stats.visible = False
+            self._practice_topics.visible = False
+            self._search_input.visible = False
 
     def toggle(self) -> None:
         expanded = self._expanded.visible
@@ -150,7 +243,6 @@ class Sidebar:
 
     def _toggle_theme(self, e: ft.ControlEvent) -> None:
         page = e.control.page
-        # Cycle: SYSTEM/LIGHT → DARK → LIGHT → DARK → …
         current = page.theme_mode
         page.theme_mode = (
             ft.ThemeMode.DARK

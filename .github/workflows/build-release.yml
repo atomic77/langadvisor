@@ -1,0 +1,199 @@
+name: Build And Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing git tag to build and release, for example v1.2.3"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  UV_PYTHON: "3.12"
+  PYTHONUTF8: "1"
+  FLET_CLI_NO_RICH_OUTPUT: "1"
+
+jobs:
+  prepare:
+    name: Resolve Release Tag
+    runs-on: ubuntu-latest
+    outputs:
+      release_tag: ${{ steps.resolve.outputs.release_tag }}
+      release_ref: ${{ steps.resolve.outputs.release_ref }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve tag
+        id: resolve
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+          PUSH_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          git fetch --force --tags
+
+          if [[ "${EVENT_NAME}" == "workflow_dispatch" ]]; then
+            TAG="${INPUT_TAG}"
+          else
+            TAG="${PUSH_TAG}"
+          fi
+
+          if [[ -z "${TAG}" ]]; then
+            echo "::error::No release tag was provided."
+            exit 1
+          fi
+
+          if ! git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+            echo "::error::Tag '${TAG}' does not exist in this repository."
+            exit 1
+          fi
+
+          echo "release_tag=${TAG}" >> "${GITHUB_OUTPUT}"
+          echo "release_ref=refs/tags/${TAG}" >> "${GITHUB_OUTPUT}"
+
+  build:
+    name: Build ${{ matrix.label }}
+    needs: prepare
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - label: windows-x64
+            runner: windows-latest
+            target: windows
+            output_dir: build/windows
+            asset_suffix: windows-x64
+            needs_linux_deps: false
+
+          - label: macos-arm64
+            runner: macos-14
+            target: macos
+            output_dir: build/macos
+            asset_suffix: macos-arm64
+            needs_linux_deps: false
+
+          - label: linux-x64
+            runner: ubuntu-24.04
+            target: linux
+            output_dir: build/linux
+            asset_suffix: linux-x64
+            needs_linux_deps: true
+
+          - label: linux-arm64
+            runner: ubuntu-24.04-arm
+            target: linux
+            output_dir: build/linux
+            asset_suffix: linux-arm64
+            needs_linux_deps: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.release_ref }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.UV_PYTHON }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Sync dependencies
+        run: uv sync --locked
+
+      - name: Install Linux desktop dependencies
+        if: matrix.needs_linux_deps
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt update --allow-releaseinfo-change
+          LINUX_DEPS="$(uv run python -c 'from flet.utils.linux_deps import linux_dependencies; print(" ".join(linux_dependencies))')"
+          sudo apt-get install -y --no-install-recommends ${LINUX_DEPS}
+
+      - name: Build app on Linux
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv run flet build "${{ matrix.target }}" . \
+            --output "${{ matrix.output_dir }}" \
+            --yes \
+            --verbose
+
+      - name: Build app on macOS
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv run flet build "${{ matrix.target }}" . \
+            --output "${{ matrix.output_dir }}" \
+            --arch arm64 \
+            --yes \
+            --verbose
+
+      - name: Build app on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          uv run flet build "${{ matrix.target }}" . --output "${{ matrix.output_dir }}" --yes --verbose
+
+      - name: Archive build on Linux and macOS
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          cd "${{ matrix.output_dir }}"
+          zip -r "../../release/langadvisor-${{ needs.prepare.outputs.release_tag }}-${{ matrix.asset_suffix }}.zip" .
+
+      - name: Archive build on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path release | Out-Null
+          Compress-Archive -Path "${{ matrix.output_dir }}\*" -DestinationPath "release\langadvisor-${{ needs.prepare.outputs.release_tag }}-${{ matrix.asset_suffix }}.zip"
+
+      - name: Upload packaged build
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_suffix }}
+          path: release/langadvisor-${{ needs.prepare.outputs.release_tag }}-${{ matrix.asset_suffix }}.zip
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    needs:
+      - prepare
+      - build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download packaged builds
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Create or update release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare.outputs.release_tag }}
+          name: LangAdvisor ${{ needs.prepare.outputs.release_tag }}
+          files: release-assets/*
+          fail_on_unmatched_files: true
+          generate_release_notes: true

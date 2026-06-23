@@ -1,25 +1,20 @@
 # LangAdvisor
 
-A Flet GUI application for grammar assessment using local LLMs via Ollama.
+A Flet GUI application for grammar assessment and using local LLMs via Ollama.
 
 ## Prerequisites
 
 - Python 3.10+
 - [Ollama](https://ollama.com/) running locally with a model available (e.g. `ollama pull llama3.2`)
 
-## Setup
 
-1. **Create a virtual environment and install dependencies**:
-   ```bash
-   uv venv
-   source .venv/bin/activate
-   uv sync
-   ```
+## Development
 
-2. **Run the app**
-   ```bash
-   python main.py
-   ```
+To run the app locally - uv will automatically create a local virtual environment and pull down related dependencies:
+   
+```bash
+   uv run main.py
+```
 
 ## Project Structure
 
