@@ -78,12 +78,13 @@ jobs:
             asset_suffix: windows-x64
             needs_linux_deps: false
 
-          - label: macos-arm64
-            runner: macos-14
-            target: macos
-            output_dir: build/macos
-            asset_suffix: macos-arm64
-            needs_linux_deps: false
+          # TODO : osx build is huge, figure out why
+          # - label: macos-arm64
+          #   runner: macos-14
+          #   target: macos
+          #   output_dir: build/macos
+          #   asset_suffix: macos-arm64
+          #   needs_linux_deps: false
 
           - label: linux-x64
             runner: ubuntu-24.04
