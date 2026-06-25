@@ -78,6 +78,15 @@ def save_entry(entry: HistoryEntry, db_path: Path | None = None) -> None:
         conn.commit()
 
 
+def clear_entries(db_path: Path | None = None) -> None:
+    """Remove all persisted assessment history entries."""
+    path = db_path or HISTORY_DB
+    _ensure_db(path)
+    with sqlite3.connect(path) as conn:
+        conn.execute("DELETE FROM history")
+        conn.commit()
+
+
 def load_setting(key: str, db_path: Path | None = None) -> str | None:
     """Load a setting value by key from SQLite."""
     path = db_path or HISTORY_DB

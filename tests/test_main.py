@@ -192,6 +192,27 @@ class TestHistoryStore:
         store.add(entry)
         mock_save.assert_called_once_with(entry)
 
+    def test_clear_removes_entries_and_notifies_listener(self):
+        store = HistoryStore(persist=False)
+        store.add(HistoryEntry(text="hi", language="English", formality="Formal", model="m", verdict="yes"))
+        called = {"times": 0}
+
+        def cb():
+            called["times"] += 1
+
+        store.on_change(cb)
+        store.clear()
+
+        assert store.all() == []
+        assert called["times"] == 1
+
+    @patch("core.persistence.load_entries", return_value=[])
+    @patch("core.persistence.clear_entries")
+    def test_persist_clears_entries(self, mock_clear, mock_load):
+        store = HistoryStore(persist=True)
+        store.clear()
+        mock_clear.assert_called_once_with()
+
 
 # ---------------------------------------------------------------------------
 # Model fetcher
@@ -259,6 +280,17 @@ class TestSidebarSearch:
         results = [e for e in sample_store.all() if sidebar._matches_search(e)]
         assert len(results) == 0
 
+    def test_clear_history_button_tracks_entries(self):
+        store = HistoryStore(persist=False)
+        sidebar = Sidebar(store, on_new=lambda: None, on_load=lambda idx: None)
+        assert sidebar._clear_history_btn.disabled is True
+
+        store.add(HistoryEntry(text="Hi", language="English", formality="Formal", model="m", verdict="yes"))
+        assert sidebar._clear_history_btn.disabled is False
+
+        store.clear()
+        assert sidebar._clear_history_btn.disabled is True
+        assert sidebar._history_list.controls == []
 
 
 class TestLlmDefaultModel:

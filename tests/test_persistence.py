@@ -5,6 +5,7 @@ import pytest
 from core.history_store import HistoryEntry
 from core.languages import DEFAULT_ENABLED_LANGUAGES
 from core.persistence import (
+    clear_entries,
     load_default_model,
     load_enabled_languages,
     load_entries,
@@ -64,6 +65,18 @@ class TestPersistence:
         entries = load_entries(temp_db)
         assert entries[0].feedback == ""
         assert entries[0].suggestion == ""
+
+    def test_clear_entries_removes_history_only(self, temp_db):
+        save_entry(
+            HistoryEntry(text="Hi", language="E", formality="C", model="m", verdict="yes"),
+            temp_db,
+        )
+        save_setting("theme", "dark", temp_db)
+
+        clear_entries(temp_db)
+
+        assert load_entries(temp_db) == []
+        assert load_setting("theme", temp_db) == "dark"
 
     def test_save_and_load_generic_setting(self, temp_db):
         save_setting("theme", "dark", temp_db)

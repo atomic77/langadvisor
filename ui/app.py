@@ -28,7 +28,7 @@ _active_mode = "grammar"
 
 
 def main(page: ft.Page):
-    page.title = "Grammar Assessor"
+    page.title = "Lang Advisor"
     page.theme_mode = ft.ThemeMode.DARK
     page.padding = 20
 

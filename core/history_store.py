@@ -33,6 +33,13 @@ class HistoryStore:
             save_entry(entry)
         self._notify()
 
+    def clear(self) -> None:
+        self._entries.clear()
+        if self._persist:
+            from core.persistence import clear_entries
+            clear_entries()
+        self._notify()
+
     def get(self, idx: int) -> HistoryEntry:
         return self._entries[idx]
 

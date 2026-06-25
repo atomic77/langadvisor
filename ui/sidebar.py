@@ -144,6 +144,21 @@ class Sidebar:
         )
         divider = ft.Divider(height=1, color=ft.Colors.OUTLINE_VARIANT)
         self._history_header = ft.Text("History", size=13, weight=ft.FontWeight.W_600)
+        self._clear_history_btn = ft.IconButton(
+            icon=ft.icons.Icons.DELETE_OUTLINE,
+            icon_size=16,
+            tooltip="Clear history",
+            on_click=lambda e: self._clear_history(e),
+            disabled=True,
+        )
+        self._history_header_row = ft.Row(
+            controls=[
+                self._history_header,
+                self._clear_history_btn,
+            ],
+            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        )
 
         self._practice_stats = ft.Column(
             controls=[
@@ -175,7 +190,7 @@ class Sidebar:
                     search_btn,
                     self._search_input,
                     divider,
-                    self._history_header,
+                    self._history_header_row,
                     self._practice_stats,
                     self._practice_topics,
                     self._history_list,
@@ -219,18 +234,21 @@ class Sidebar:
         """Show contextual sidebar content for the active mode."""
         if self._mode == "practice":
             self._history_header.value = "Practice"
+            self._clear_history_btn.visible = False
             self._history_list.visible = False
             self._practice_stats.visible = False
             self._practice_topics.visible = False
             self._search_input.visible = False
         elif self._mode == "settings":
             self._history_header.value = "Settings"
+            self._clear_history_btn.visible = False
             self._history_list.visible = False
             self._practice_stats.visible = False
             self._practice_topics.visible = False
             self._search_input.visible = False
         else:
             self._history_header.value = "History"
+            self._clear_history_btn.visible = True
             self._history_list.visible = True
             self._practice_stats.visible = False
             self._practice_topics.visible = False
@@ -266,6 +284,12 @@ class Sidebar:
         self._search_query = query.strip().lower()
         self._rebuild_history_list()
 
+    def _clear_history(self, e: ft.ControlEvent) -> None:
+        self._search_query = ""
+        self._search_input.value = ""
+        self._store.clear()
+        e.control.page.update()
+
     def _matches_search(self, entry) -> bool:
         if not self._search_query:
             return True
@@ -282,7 +306,9 @@ class Sidebar:
 
     def _rebuild_history_list(self) -> None:
         self._history_list.controls.clear()
-        for original_idx, entry in enumerate(self._store.all()):
+        entries = self._store.all()
+        self._clear_history_btn.disabled = not entries
+        for original_idx, entry in enumerate(entries):
             if not self._matches_search(entry):
                 continue
             preview = (entry.text[:60] + "…") if len(entry.text) > 60 else entry.text
