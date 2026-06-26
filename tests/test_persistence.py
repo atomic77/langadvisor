@@ -3,17 +3,24 @@
 import pytest
 
 from core.history_store import HistoryEntry
+from core.lesson_store import LessonEntry
 from core.languages import DEFAULT_ENABLED_LANGUAGES
 from core.persistence import (
     clear_entries,
     load_default_model,
     load_enabled_languages,
     load_entries,
+    load_lesson_rounds,
     load_setting,
+    load_ui_font_family,
+    load_ui_font_scale,
     save_default_model,
     save_enabled_languages,
     save_entry,
+    save_lesson_round,
     save_setting,
+    save_ui_font_family,
+    save_ui_font_scale,
 )
 
 
@@ -101,3 +108,48 @@ class TestPersistence:
     def test_enabled_languages_defaults_when_corrupt(self, temp_db):
         save_setting("enabled_languages", "{not-json", temp_db)
         assert load_enabled_languages(temp_db) == DEFAULT_ENABLED_LANGUAGES
+
+    def test_save_and_load_ui_font_scale(self, temp_db):
+        save_ui_font_scale(1.25, temp_db)
+        assert load_ui_font_scale(temp_db) == 1.25
+
+    def test_ui_font_scale_defaults_when_missing(self, temp_db):
+        assert load_ui_font_scale(temp_db) == 1.0
+
+    def test_ui_font_scale_defaults_when_invalid(self, temp_db):
+        save_setting("ui_font_scale", "abc", temp_db)
+        assert load_ui_font_scale(temp_db) == 1.0
+
+    def test_ui_font_scale_defaults_when_out_of_bounds(self, temp_db):
+        save_setting("ui_font_scale", "3.0", temp_db)
+        assert load_ui_font_scale(temp_db) == 1.0
+
+    def test_save_and_load_ui_font_family(self, temp_db):
+        save_ui_font_family("serif", temp_db)
+        assert load_ui_font_family(temp_db) == "serif"
+
+    def test_ui_font_family_defaults_when_missing(self, temp_db):
+        assert load_ui_font_family(temp_db) == ""
+
+    def test_save_and_load_lesson_round_with_romanization(self, temp_db):
+        entry = LessonEntry(
+            language="Japanese",
+            formality="Colloquial",
+            ects_level="A1",
+            category="Greetings",
+            model="mistral",
+            phrases=[("こんにちは", "Hello", "konnichiwa")],
+            answers=["Hello"],
+            results=[{"score": 10, "romanization": "konnichiwa"}],
+            summary="Strong round.",
+            score_total=10,
+            score_max=10,
+        )
+
+        save_lesson_round(entry, temp_db)
+        entries = load_lesson_rounds(temp_db)
+
+        assert len(entries) == 1
+        assert entries[0].phrases == [("こんにちは", "Hello", "konnichiwa")]
+        assert entries[0].results[0]["romanization"] == "konnichiwa"
+

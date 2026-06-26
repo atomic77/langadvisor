@@ -5,6 +5,18 @@ import asyncio
 from core.llm import check_translation, generate_practice_sentence
 
 
+def _phrase_text(phrase: tuple[str, ...]) -> str:
+    return phrase[0] if len(phrase) > 0 else ""
+
+
+def _phrase_reference(phrase: tuple[str, ...]) -> str:
+    return phrase[1] if len(phrase) > 1 else ""
+
+
+def _phrase_romanization(phrase: tuple[str, ...]) -> str:
+    return phrase[2] if len(phrase) > 2 else ""
+
+
 class PracticeService:
     """Handles phrase generation and translation checking."""
 
@@ -24,20 +36,25 @@ class PracticeService:
 
         self._panel.set_generating(True)
         self._panel.clear_output()
+        self._panel.clear_romanization()
         self._help_translation = ""
         self._page.update()
 
         self._running_task = asyncio.current_task()
         try:
-            phrase, translation = await generate_practice_sentence(
+            generated = await generate_practice_sentence(
                 self._panel.selected_language,
                 self._panel.selected_ects_level,
                 self._panel.selected_formality,
                 self._panel.selected_category,
                 self._panel.selected_model,
+                include_romanization=self._panel.latinization_enabled,
             )
+            phrase = _phrase_text(generated)
+            translation = _phrase_reference(generated)
+            romanization = _phrase_romanization(generated)
             self._help_translation = translation
-            self._panel.set_source_phrase(phrase)
+            self._panel.set_source_phrase(phrase, romanization=romanization)
             self._page.update()
         except asyncio.CancelledError:
             self._panel.set_source_phrase("(Generation cancelled)")

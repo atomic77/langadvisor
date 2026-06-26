@@ -13,7 +13,11 @@ Want some interactive practice, suited to your level and a topic of interest? Yo
 
 ![alt text](docs/practice.png)
 
-Virtually any major language is supported, and you can decide which Ollama model you wish to use depending on your desire for local execution, speed or accuracy:
+A lesson mode can be used to queue up a series of phrases that are graded at the end, with help provided along the way as needed.
+![lesson](docs/lesson.png)
+
+
+Virtually any major language is supported, including ancient languages, and you can decide which Ollama model you wish to use depending on your desire for local execution, speed or accuracy. Latinization is supported for non-Western languages, where such a standard exists. More obscure languages may require a more powerful model to get decent results:
 
 ![alt text](docs/settings.png)
 

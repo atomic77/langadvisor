@@ -3,6 +3,7 @@
 import flet as ft
 
 from core.history_store import HistoryStore
+from ui.typography import clamp_font_scale, scale_control_fonts
 
 
 class Sidebar:
@@ -21,7 +22,8 @@ class Sidebar:
         self._on_mode_change = on_mode_change
         self._store.on_change(self._rebuild_history_list)
         self._search_query = ""
-        self._mode = "grammar"  # "grammar", "practice", or "settings"
+        self._mode = "grammar"
+        self._font_scale = 1.0
 
         self._theme_btn_collapsed = ft.IconButton(
             icon=ft.icons.Icons.DARK_MODE,
@@ -72,6 +74,12 @@ class Sidebar:
                         on_click=lambda e: self._set_mode("practice"),
                     ),
                     ft.IconButton(
+                        icon=ft.icons.Icons.MENU_BOOK,
+                        icon_size=22,
+                        tooltip="Lesson",
+                        on_click=lambda e: self._set_mode("lesson"),
+                    ),
+                    ft.IconButton(
                         icon=ft.icons.Icons.SETTINGS,
                         icon_size=22,
                         tooltip="Settings",
@@ -93,7 +101,7 @@ class Sidebar:
         header = ft.Container(
             content=ft.Row(
                 controls=[
-                    ft.Text("Sidebar", size=14, weight=ft.FontWeight.W_600),
+                    ft.Text("Lang Advisor", size=14, weight=ft.FontWeight.W_600),
                     self._theme_btn_expanded,
                     ft.IconButton(
                         icon=ft.icons.Icons.MENU_OPEN,
@@ -119,6 +127,12 @@ class Sidebar:
             ),
             on_click=lambda e: self._set_mode("practice"),
         )
+        self._lesson_link = ft.TextButton(
+            content=ft.Row(
+                [ft.Icon(ft.icons.Icons.MENU_BOOK, size=16), ft.Text("Lesson", size=13)]
+            ),
+            on_click=lambda e: self._set_mode("lesson"),
+        )
         self._settings_link = ft.TextButton(
             content=ft.Row(
                 [ft.Icon(ft.icons.Icons.SETTINGS, size=16), ft.Text("Settings", size=13)]
@@ -132,8 +146,8 @@ class Sidebar:
             on_click=lambda e: self._toggle_search(e),
         )
         self._search_input = ft.TextField(
-            label="Search history…",
-            hint_text="Filter by text, language, model…",
+            label="Search history...",
+            hint_text="Filter by text, language, model...",
             on_change=lambda e: self._apply_search(e.control.value),
             visible=False,
             dense=True,
@@ -162,7 +176,7 @@ class Sidebar:
 
         self._practice_stats = ft.Column(
             controls=[
-                ft.Text("🔥 Streak: 0", size=12),
+                ft.Text("Streak: 0", size=12),
                 ft.Text("Session: 0 correct", size=11, color=ft.Colors.GREY),
                 ft.Text("Total completed: 0", size=11, color=ft.Colors.GREY),
             ],
@@ -171,10 +185,10 @@ class Sidebar:
         )
         self._practice_topics = ft.Column(
             controls=[
-                self._make_topic_btn("Grammar Rules", "📝"),
-                self._make_topic_btn("Verb Tenses", "🔄"),
-                self._make_topic_btn("Prepositions", "📍"),
-                self._make_topic_btn("Articles", "🔤"),
+                self._make_topic_btn("Grammar Rules"),
+                self._make_topic_btn("Verb Tenses"),
+                self._make_topic_btn("Prepositions"),
+                self._make_topic_btn("Articles"),
             ],
             spacing=6,
             visible=False,
@@ -186,6 +200,7 @@ class Sidebar:
                     header,
                     new_btn,
                     self._practice_link,
+                    self._lesson_link,
                     self._settings_link,
                     search_btn,
                     self._search_input,
@@ -212,9 +227,18 @@ class Sidebar:
 
         self._rebuild_history_list()
 
-    def _make_topic_btn(self, label: str, emoji: str) -> ft.Container:
+    def apply_typography(self, scale: float) -> None:
+        self._font_scale = clamp_font_scale(scale)
+        self._expanded.width = int(220 + (self._font_scale - 1.0) * 120)
+        self._collapsed.width = int(48 + (self._font_scale - 1.0) * 18)
+        self._expanded.padding = int(10 + (self._font_scale - 1.0) * 4)
+        self._history_list.spacing = int(6 + (self._font_scale - 1.0) * 3)
+        scale_control_fonts(self.view, self._font_scale)
+        self._rebuild_history_list()
+
+    def _make_topic_btn(self, label: str) -> ft.Container:
         return ft.Container(
-            content=ft.Text(f"{emoji}  {label}", size=12),
+            content=ft.Text(label, size=12),
             border=ft.Border.all(1, ft.Colors.OUTLINE),
             border_radius=5,
             padding=ft.padding.Padding(left=8, top=6, right=8, bottom=6),
@@ -222,7 +246,6 @@ class Sidebar:
         )
 
     def _set_mode(self, mode: str) -> None:
-        """Switch between 'grammar', 'practice', and 'settings' mode."""
         if self._mode == mode:
             return
         self._mode = mode
@@ -231,9 +254,15 @@ class Sidebar:
             self._on_mode_change(mode)
 
     def _update_contextual_content(self) -> None:
-        """Show contextual sidebar content for the active mode."""
         if self._mode == "practice":
             self._history_header.value = "Practice"
+            self._clear_history_btn.visible = False
+            self._history_list.visible = False
+            self._practice_stats.visible = False
+            self._practice_topics.visible = False
+            self._search_input.visible = False
+        elif self._mode == "lesson":
+            self._history_header.value = "Lesson"
             self._clear_history_btn.visible = False
             self._history_list.visible = False
             self._practice_stats.visible = False
@@ -308,10 +337,16 @@ class Sidebar:
         self._history_list.controls.clear()
         entries = self._store.all()
         self._clear_history_btn.disabled = not entries
+        preview_len = 72
+        if self._font_scale > 1.3:
+            preview_len = 44
+        elif self._font_scale > 1.1:
+            preview_len = 56
+
         for original_idx, entry in enumerate(entries):
             if not self._matches_search(entry):
                 continue
-            preview = (entry.text[:60] + "…") if len(entry.text) > 60 else entry.text
+            preview = (entry.text[:preview_len] + "...") if len(entry.text) > preview_len else entry.text
             verdict = entry.verdict
             badge_color = ft.Colors.GREEN if verdict == "yes" else ft.Colors.RED
             badge = ft.Container(
@@ -354,3 +389,5 @@ class Sidebar:
                 on_click=lambda e, idx=original_idx: self._on_load(idx),
             )
             self._history_list.controls.append(item)
+
+        scale_control_fonts(self._history_list, self._font_scale)

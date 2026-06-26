@@ -12,7 +12,7 @@ class PracticePanel:
         # --- Language dropdown ---
         self._lang_dropdown = ft.Dropdown(
             label="Language",
-            width=150,
+            width=250,
             value="Serbian",
             options=[ft.dropdown.Option(lang, lang) for lang in DEFAULT_ENABLED_LANGUAGES],
         )
@@ -32,7 +32,7 @@ class PracticePanel:
         # --- Category dropdown ---
         self._category_dropdown = ft.Dropdown(
             label="Category",
-            width=220,
+            width=350,
             value="Everyday Conversation",
             options=[
                 ft.dropdown.Option("Everyday Conversation", "Everyday Conversation"),
@@ -56,7 +56,7 @@ class PracticePanel:
         # --- Generate controls ---
         self._ects_dropdown = ft.Dropdown(
             label="ECTS Level",
-            width=200,
+            width=250,
             value="A1",
             options=[
                 ft.dropdown.Option("A1", "A1 - Beginner"),
@@ -67,7 +67,12 @@ class PracticePanel:
                 ft.dropdown.Option("C2", "C2 - Proficient"),
             ],
         )
-        self._generate_btn = ft.Button("Generate", icon="AUTO_AWESOME", width=130)
+        self._latinization_checkbox = ft.Checkbox(
+            label="Latinization",
+            value=False,
+            tooltip="Show standard romanization for non-Latin scripts when available.",
+        )
+        self._generate_btn = ft.Button("Generate", icon=ft.icons.Icons.AUTO_AWESOME, width=130)
         self._generating_indicator = ft.ProgressRing(
             width=20, height=20, visible=False, stroke_width=2
         )
@@ -84,6 +89,28 @@ class PracticePanel:
             border_radius=5,
             padding=ft.padding.Padding(left=12, top=10, right=12, bottom=10),
             width=580,
+        )
+        self._romanization_text = ft.Text(
+            value="", size=13, selectable=True, color=ft.Colors.BLUE_200
+        )
+        self._romanization_box = ft.Container(
+            content=ft.Column(
+                controls=[
+                    ft.Text(
+                        "Latinization",
+                        size=11,
+                        weight=ft.FontWeight.W_600,
+                        color=ft.Colors.GREY,
+                    ),
+                    self._romanization_text,
+                ],
+                spacing=3,
+            ),
+            border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
+            border_radius=5,
+            padding=ft.padding.Padding(left=12, top=8, right=12, bottom=8),
+            width=580,
+            visible=False,
         )
 
         # --- User translation input ---
@@ -102,8 +129,8 @@ class PracticePanel:
         )
 
         # --- Check/help buttons ---
-        self._check_btn = ft.Button("Check", icon="CHECK", width=130)
-        self._help_btn = ft.Button("Help", icon="LIGHTBULB_OUTLINE", width=130)
+        self._check_btn = ft.Button("Check", icon=ft.icons.Icons.CHECK, width=130)
+        self._help_btn = ft.Button("Help", icon=ft.icons.Icons.LIGHTBULB_OUTLINE, width=130)
         self._check_indicator = ft.ProgressRing(
             width=20, height=20, visible=False, stroke_width=2
         )
@@ -170,6 +197,7 @@ class PracticePanel:
                 ft.Row(
                     controls=[
                         self._ects_dropdown,
+                        self._latinization_checkbox,
                         self._generate_btn,
                         self._generating_indicator,
                     ],
@@ -180,6 +208,7 @@ class PracticePanel:
                 ft.Text("Translate this phrase:", size=13, weight=ft.FontWeight.W_500),
                 ft.Container(height=4),
                 self._source_box,
+                self._romanization_box,
                 ft.Container(height=10),
                 self._translation_input,
                 ft.Container(height=10),
@@ -222,27 +251,33 @@ class PracticePanel:
         # Model selection now comes from Settings (global default).
         return ""
 
+    @property
+    def latinization_enabled(self) -> bool:
+        return bool(self._latinization_checkbox.value)
+
     # -- state --
 
     def set_generating(self, generating: bool) -> None:
         self._generating_indicator.visible = generating
         if generating:
             self._generate_btn.text = "Cancel"
-            self._generate_btn.icon = "CLOSE"
+            self._generate_btn.icon = ft.icons.Icons.CLOSE
+            self._latinization_checkbox.disabled = True
         else:
             self._generate_btn.text = "Generate"
-            self._generate_btn.icon = "AUTO_AWESOME"
+            self._generate_btn.icon = ft.icons.Icons.AUTO_AWESOME
             self._generate_btn.disabled = False
+            self._latinization_checkbox.disabled = False
 
     def set_checking(self, checking: bool) -> None:
         self._check_indicator.visible = checking
         self._help_btn.disabled = checking
         if checking:
             self._check_btn.text = "Cancel"
-            self._check_btn.icon = "CLOSE"
+            self._check_btn.icon = ft.icons.Icons.CLOSE
         else:
             self._check_btn.text = "Check"
-            self._check_btn.icon = "CHECK"
+            self._check_btn.icon = ft.icons.Icons.CHECK
             self._check_btn.disabled = False
 
     def set_languages(self, languages: list[str]) -> None:
@@ -270,10 +305,16 @@ class PracticePanel:
         self._help_text.value = ""
         self._output_box.visible = False
 
-    def set_source_phrase(self, phrase: str) -> None:
+    def clear_romanization(self) -> None:
+        self._romanization_text.value = ""
+        self._romanization_box.visible = False
+
+    def set_source_phrase(self, phrase: str, romanization: str = "") -> None:
         self._source_box.content.value = phrase
         self._source_box.content.color = ft.Colors.ON_SURFACE
         self._source_box.content.italic = False
+        self._romanization_text.value = romanization
+        self._romanization_box.visible = bool(romanization.strip())
         self._translation_input.value = ""
         self.clear_output()
 

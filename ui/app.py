@@ -7,20 +7,28 @@ import flet as ft
 
 from core.history_store import HistoryStore
 from core.languages import DEFAULT_ENABLED_LANGUAGES, TOP_50_LANGUAGES
+from core.lesson_store import LessonStore
 from core.llm import set_default_model
 from core.model_fetcher import fetch_ollama_models
 from core.persistence import (
     load_default_model,
     load_enabled_languages,
+    load_ui_font_family,
+    load_ui_font_scale,
     save_default_model,
     save_enabled_languages,
+    save_ui_font_family,
+    save_ui_font_scale,
 )
 from services.assessor import AssessorService
+from services.lesson_service import LessonService
 from services.practice_service import PracticeService
 from ui.assessment_panel import AssessmentPanel
+from ui.lesson_panel import LessonPanel
 from ui.practice_panel import PracticePanel
 from ui.settings_panel import SettingsPanel
 from ui.sidebar import Sidebar
+from ui.typography import clamp_font_scale, scale_control_fonts
 
 
 _loading_from_history = False
@@ -34,6 +42,8 @@ def main(page: ft.Page):
 
     store = HistoryStore()
     default_model = load_default_model()
+    ui_font_scale = clamp_font_scale(load_ui_font_scale())
+    ui_font_family = load_ui_font_family()
 
     available_languages = TOP_50_LANGUAGES.copy()
     selected_languages = [
@@ -50,8 +60,27 @@ def main(page: ft.Page):
         on_assess_click=None, on_text_change=None, on_keyboard=None
     )
     practice_panel = PracticePanel()
+    lesson_panel = LessonPanel()
     assessment_panel.set_languages(selected_languages)
     practice_panel.set_languages(selected_languages)
+    lesson_panel.set_languages(selected_languages)
+
+    def _apply_ui_preferences() -> None:
+        nonlocal ui_font_scale, ui_font_family
+
+        family = ui_font_family or None
+        page.theme = ft.Theme(font_family=family)
+        page.dark_theme = ft.Theme(font_family=family)
+
+        sidebar.apply_typography(ui_font_scale)
+        lesson_panel.apply_typography(ui_font_scale)
+        settings_panel.apply_typography(ui_font_scale)
+
+        scale_control_fonts(assessment_panel.view, ui_font_scale)
+        scale_control_fonts(practice_panel.view, ui_font_scale)
+        scale_control_fonts(content_area, ui_font_scale)
+
+        spacer.width = max(12, int(round(15 * ui_font_scale)))
 
     def _on_default_model_change(model: str):
         nonlocal default_model
@@ -65,16 +94,37 @@ def main(page: ft.Page):
     def _on_enabled_languages_change(languages: list[str]):
         assessment_panel.set_languages(languages)
         practice_panel.set_languages(languages)
+        lesson_panel.set_languages(languages)
         save_enabled_languages(languages)
+        page.update()
+
+    def _on_font_scale_change(scale: float) -> None:
+        nonlocal ui_font_scale
+        ui_font_scale = clamp_font_scale(scale)
+        settings_panel.set_font_scale(ui_font_scale)
+        save_ui_font_scale(ui_font_scale)
+        _apply_ui_preferences()
+        page.update()
+
+    def _on_font_family_change(font_family: str) -> None:
+        nonlocal ui_font_family
+        ui_font_family = font_family or ""
+        settings_panel.set_font_family(ui_font_family)
+        save_ui_font_family(ui_font_family)
+        _apply_ui_preferences()
         page.update()
 
     settings_panel = SettingsPanel(
         on_default_model_change=_on_default_model_change,
         all_languages=available_languages,
         on_enabled_languages_change=_on_enabled_languages_change,
+        on_font_scale_change=_on_font_scale_change,
+        on_font_family_change=_on_font_family_change,
     )
     settings_panel.bind_page(page)
     settings_panel.set_selected_languages(selected_languages)
+    settings_panel.set_font_scale(ui_font_scale)
+    settings_panel.set_font_family(ui_font_family)
 
     content_area = ft.Container(content=assessment_panel.view, expand=True)
 
@@ -83,10 +133,13 @@ def main(page: ft.Page):
         _active_mode = mode
         if mode == "practice":
             content_area.content = practice_panel.view
+        elif mode == "lesson":
+            content_area.content = lesson_panel.view
         elif mode == "settings":
             content_area.content = settings_panel.view
         else:
             content_area.content = assessment_panel.view
+        _apply_ui_preferences()
         page.update()
 
     def _new_assessment():
@@ -133,10 +186,22 @@ def main(page: ft.Page):
     practice_panel._check_btn.on_click = practice_service.on_check
     practice_panel._help_btn.on_click = practice_service.on_help
 
+    lesson_store = LessonStore()
+    lesson_service = LessonService(lesson_panel, page, lesson_store)
+    lesson_panel._start_btn.on_click = lesson_service.on_start
+    lesson_panel._prev_btn.on_click = lesson_service.on_prev
+    lesson_panel._next_btn.on_click = lesson_service.on_next
+    lesson_panel._help_btn.on_click = lesson_service.on_help
+    lesson_panel._skip_btn.on_click = lesson_service.on_skip
+    lesson_panel._submit_btn.on_click = lesson_service.on_submit
+    lesson_panel._reset_btn.on_click = lesson_service.on_reset
+
     def on_keyboard(e: ft.KeyboardEvent):
         if e.ctrl and e.key == "Enter":
             if _active_mode == "grammar":
                 asyncio.create_task(assessment_service.on_assess(e))
+            elif _active_mode == "lesson":
+                lesson_service.on_next(e)
 
     page.on_keyboard_event = on_keyboard
 
@@ -152,10 +217,12 @@ def main(page: ft.Page):
         else:
             message = "No Ollama models found. Pull at least one model locally."
             settings_panel.set_model_status(message, is_error=True)
+        _apply_ui_preferences()
         page.update()
 
     def _apply_error(msg):
         settings_panel.set_model_status(f"Could not load models: {msg}", is_error=True)
+        _apply_ui_preferences()
         page.update()
 
     def _do_fetch():
@@ -170,11 +237,12 @@ def main(page: ft.Page):
 
     threading.Thread(target=_do_fetch, daemon=True).start()
 
+    spacer = ft.Container(width=15)
     page.add(
         ft.Row(
             controls=[
                 sidebar.view,
-                ft.Container(width=15),
+                spacer,
                 content_area,
             ],
             spacing=0,
@@ -182,3 +250,5 @@ def main(page: ft.Page):
             expand=True,
         )
     )
+
+    _apply_ui_preferences()

@@ -28,7 +28,7 @@ class AssessmentPanel:
                 ft.dropdown.Option("Formal", "Formal"),
             ],
         )
-        self._assess_btn = ft.Button("Assess", icon="CHECK", width=130)
+        self._assess_btn = ft.Button("Assess", icon=ft.icons.Icons.CHECK, width=130)
         self._assessing_indicator = ft.ProgressRing(
             width=20, height=20, visible=False, stroke_width=2
         )
@@ -140,10 +140,10 @@ class AssessmentPanel:
         self._assessing_indicator.visible = assessing
         if assessing:
             self._assess_btn.text = "Cancel"
-            self._assess_btn.icon = "CLOSE"
+            self._assess_btn.icon = ft.icons.Icons.CLOSE
         else:
             self._assess_btn.text = "Assess"
-            self._assess_btn.icon = "CHECK"
+            self._assess_btn.icon = ft.icons.Icons.CHECK
             self._assess_btn.disabled = False
 
     def disable_assess_button(self) -> None:

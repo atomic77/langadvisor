@@ -16,6 +16,7 @@ import pytest_asyncio
 from core.history_store import HistoryEntry, HistoryStore
 from core.llm import check_grammar, get_feedback_and_suggestion, get_llm, set_default_model
 from core.model_fetcher import fetch_ollama_models
+from services.practice_service import PracticeService
 from ui.assessment_panel import AssessmentPanel
 from ui.practice_panel import PracticePanel
 from ui.sidebar import Sidebar
@@ -304,6 +305,66 @@ class TestLlmDefaultModel:
     def test_raises_when_no_model_available(self):
         with pytest.raises(ValueError):
             get_llm("")
+
+
+class TestPracticePanelLatinization:
+    def test_set_source_phrase_shows_romanization_when_present(self):
+        panel = PracticePanel()
+
+        panel.set_source_phrase("こんにちは", romanization="konnichiwa")
+
+        assert panel.source_phrase == "こんにちは"
+        assert panel._romanization_box.visible is True
+        assert panel._romanization_text.value == "konnichiwa"
+
+    def test_set_source_phrase_hides_romanization_when_missing(self):
+        panel = PracticePanel()
+
+        panel.set_source_phrase("Bonjour")
+
+        assert panel._romanization_box.visible is False
+        assert panel._romanization_text.value == ""
+
+    def test_set_generating_disables_latinization_checkbox(self):
+        panel = PracticePanel()
+
+        panel.set_generating(True)
+        assert panel._latinization_checkbox.disabled is True
+
+        panel.set_generating(False)
+        assert panel._latinization_checkbox.disabled is False
+
+
+class TestPracticeServiceLatinization:
+    @patch("core.llm.get_llm")
+    @pytest.mark.asyncio
+    async def test_generate_requests_and_displays_romanization(self, mock_get_llm):
+        llm = MagicMock()
+        llm.ainvoke = AsyncMock(
+            return_value=MagicMock(
+                content=(
+                    "PHRASE: こんにちは\n"
+                    "TRANSLATION: Hello\n"
+                    "ROMANIZATION: konnichiwa"
+                )
+            )
+        )
+        mock_get_llm.return_value = llm
+        panel = PracticePanel()
+        panel._lang_dropdown.value = "Japanese"
+        panel._latinization_checkbox.value = True
+        page = MagicMock()
+        service = PracticeService(panel, page)
+
+        await service.on_generate(None)
+
+        assert panel.source_phrase == "こんにちは"
+        assert panel._romanization_box.visible is True
+        assert panel._romanization_text.value == "konnichiwa"
+        assert service._help_translation == "Hello"
+        system_prompt = llm.ainvoke.await_args.args[0][0][1]
+        assert "ROMANIZATION" in system_prompt
+        assert "modified Hepburn" in system_prompt
 
 
 class TestLanguageDropdownConfiguration:
