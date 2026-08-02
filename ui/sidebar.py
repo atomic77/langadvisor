@@ -80,6 +80,12 @@ class Sidebar:
                         on_click=lambda e: self._set_mode("lesson"),
                     ),
                     ft.IconButton(
+                        icon=ft.icons.Icons.TRANSLATE,
+                        icon_size=22,
+                        tooltip="Translation",
+                        on_click=lambda e: self._set_mode("translation"),
+                    ),
+                    ft.IconButton(
                         icon=ft.icons.Icons.SETTINGS,
                         icon_size=22,
                         tooltip="Settings",
@@ -132,6 +138,12 @@ class Sidebar:
                 [ft.Icon(ft.icons.Icons.MENU_BOOK, size=16), ft.Text("Lesson", size=13)]
             ),
             on_click=lambda e: self._set_mode("lesson"),
+        )
+        self._translation_link = ft.TextButton(
+            content=ft.Row(
+                [ft.Icon(ft.icons.Icons.TRANSLATE, size=16), ft.Text("Translation", size=13)]
+            ),
+            on_click=lambda e: self._set_mode("translation"),
         )
         self._settings_link = ft.TextButton(
             content=ft.Row(
@@ -201,6 +213,7 @@ class Sidebar:
                     new_btn,
                     self._practice_link,
                     self._lesson_link,
+                    self._translation_link,
                     self._settings_link,
                     search_btn,
                     self._search_input,
@@ -263,6 +276,13 @@ class Sidebar:
             self._search_input.visible = False
         elif self._mode == "lesson":
             self._history_header.value = "Lesson"
+            self._clear_history_btn.visible = False
+            self._history_list.visible = False
+            self._practice_stats.visible = False
+            self._practice_topics.visible = False
+            self._search_input.visible = False
+        elif self._mode == "translation":
+            self._history_header.value = "Translation"
             self._clear_history_btn.visible = False
             self._history_list.visible = False
             self._practice_stats.visible = False

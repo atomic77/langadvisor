@@ -295,6 +295,123 @@ async def check_translation(
         return f"Error: {e}"
 
 
+async def translate_text(
+    text: str,
+    source_language: str,
+    target_language: str,
+    formality: str,
+    count: int,
+    model: str,
+) -> list[tuple[str, str]]:
+    """Produce `count` distinct translations of `text` into `target_language`.
+
+    Returns a list of (translation, tag) tuples. The tag is a short label the
+    model provides (e.g. "formal", "idiomatic", "literal") to help the user
+    distinguish variants. Missing or malformed responses are dropped, so the
+    returned list may be shorter than `count`. Errors return a single-tag
+    sentinel item: ("Cannot connect to Ollama.", "error") or
+    ("Error: <message>", "error").
+    """
+    if not text.strip() or not target_language or count <= 0:
+        return []
+    auto_detect = (source_language or "").strip().lower() == "auto-detect"
+    source_clause = (
+        "The text may be in any language — first detect the source language, "
+        "then translate."
+        if auto_detect
+        else f"The text is in {source_language}."
+    )
+    llm = get_llm(model)
+    messages = [
+        (
+            "system",
+            f"You are a professional translator. "
+            f"{source_clause} "
+            f"Produce {count} DISTINCT translations of the user's text into "
+            f"{target_language} at a {formality.lower()} register. "
+            "Each variant should be a meaningful alternative (different word "
+            "choice, structure, or tone) so the user can compare options — not "
+            "minor punctuation changes. "
+            "For each variant include a short TAG (one or two words) describing "
+            "the flavor of that translation, e.g. 'literal', 'idiomatic', "
+            "'formal', 'concise', 'expanded'. "
+            "The user may not have access to a keyboard with diacritics or "
+            "accents, so please do your best to interpret these based on the "
+            "closest English latin character approximation. "
+            "Format your response exactly as a numbered list:\n"
+            "1. TRANSLATION: <translation in target language>\n"
+            "   TAG: <short label>\n"
+            "2. TRANSLATION: <translation in target language>\n"
+            "   TAG: <short label>\n"
+            f"... and so on up to {count}. Do not add any commentary before or after the list.",
+        ),
+        ("human", text),
+    ]
+    try:
+        result = await llm.ainvoke(messages)
+        content = result.content.strip()
+        variants = _parse_translations(content, count)
+        if not variants:
+            return [(content, "")]
+        return variants
+    except ConnectError:
+        return [("Cannot connect to Ollama.", "error")]
+    except Exception as e:
+        return [(f"Error: {e}", "error")]
+
+
+def _parse_translations(
+    content: str, expected_count: int
+) -> list[tuple[str, str]]:
+    """Parse a numbered TRANSLATION/TAG list from model output."""
+    fields = "TRANSLATION|TAG"
+    numbered = re.compile(rf"^\s*(\d+)\.\s*({fields})\s*:\s*(.*)$", re.IGNORECASE)
+    unnumbered = re.compile(rf"^\s*({fields})\s*:\s*(.*)$", re.IGNORECASE)
+    by_index: dict[int, dict[str, str]] = {}
+    current_idx: int | None = None
+    current_field: str | None = None
+    for line in content.splitlines():
+        m = numbered.match(line)
+        if m:
+            idx = int(m.group(1))
+            field = m.group(2).lower()
+            value = m.group(3).strip()
+            slot = by_index.setdefault(idx, {"translation": "", "tag": ""})
+            slot[field] = value
+            current_idx = idx
+            current_field = field
+            continue
+        u = unnumbered.match(line)
+        if u and current_idx is not None:
+            field = u.group(1).lower()
+            value = u.group(2).strip()
+            slot = by_index.setdefault(
+                current_idx, {"translation": "", "tag": ""}
+            )
+            slot[field] = value
+            current_field = field
+            continue
+        # Continuation line - attach to the most recent (index, field).
+        if current_idx is not None and current_field is not None and line.strip():
+            slot = by_index.setdefault(
+                current_idx, {"translation": "", "tag": ""}
+            )
+            existing = slot.get(current_field, "")
+            slot[current_field] = (
+                (existing + "\n" + line.strip()).strip() if existing else line.strip()
+            )
+    out: list[tuple[str, str]] = []
+    for i in range(1, expected_count + 1):
+        slot = by_index.get(i)
+        if slot is None:
+            continue
+        translation = slot.get("translation", "").strip()
+        tag = slot.get("tag", "").strip()
+        if translation:
+            out.append((translation, tag))
+    return out
+
+
 def _romanization_instruction(language: str) -> str:
     """Return prompt guidance for optional Latinization generation."""
     scheme = _ROMANIZATION_SCHEMES.get(language)

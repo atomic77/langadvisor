@@ -1,7 +1,7 @@
 # LangAdvisor
 
-A Flet GUI application for grammar assessment and language practice, using local LLMs via [Ollama](https://docs.ollama.com/), or cloud
-LLMs via [Ollama Cloud](https://docs.ollama.com/cloud) service. Free-tier cloud LLMs work well. 
+A desktop GUI or web application providing a fun toolkit for polyglots out there, including grammar assessment, practice and translation. Leverages local LLMs via [Ollama](https://docs.ollama.com/) for enhanced privacy, or cloud
+LLMs via [Ollama Cloud](https://docs.ollama.com/cloud) service. Free-tier cloud LLMs such as [minimax-m3](https://ollama.com/library/minimax-m3) and [gemma4-31b](https://ollama.com/library/gemma4) work well for most uses, though any tool-enabled LLM should work.
 
 ## Features
 
@@ -15,6 +15,10 @@ Want some interactive practice, suited to your level and a topic of interest? Yo
 
 A lesson mode can be used to queue up a series of phrases that are graded at the end, with help provided along the way as needed.
 ![lesson](docs/lesson.png)
+
+A translation mode enables you to get a variety of different potential translations for phrases:
+![translation](docs/translate.png)
+
 
 
 Virtually any major language is supported, including ancient languages, and you can decide which Ollama model you wish to use depending on your desire for local execution, speed or accuracy. Latinization is supported for non-Western languages, where such a standard exists. More obscure languages may require a more powerful model to get decent results:

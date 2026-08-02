@@ -23,11 +23,13 @@ from core.persistence import (
 from services.assessor import AssessorService
 from services.lesson_service import LessonService
 from services.practice_service import PracticeService
+from services.translation_service import TranslationService
 from ui.assessment_panel import AssessmentPanel
 from ui.lesson_panel import LessonPanel
 from ui.practice_panel import PracticePanel
 from ui.settings_panel import SettingsPanel
 from ui.sidebar import Sidebar
+from ui.translation_panel import TranslationPanel
 from ui.typography import clamp_font_scale, scale_control_fonts
 
 
@@ -61,9 +63,11 @@ def main(page: ft.Page):
     )
     practice_panel = PracticePanel()
     lesson_panel = LessonPanel()
+    translation_panel = TranslationPanel()
     assessment_panel.set_languages(selected_languages)
     practice_panel.set_languages(selected_languages)
     lesson_panel.set_languages(selected_languages)
+    translation_panel.set_languages(selected_languages)
 
     def _apply_ui_preferences() -> None:
         nonlocal ui_font_scale, ui_font_family
@@ -78,6 +82,7 @@ def main(page: ft.Page):
 
         scale_control_fonts(assessment_panel.view, ui_font_scale)
         scale_control_fonts(practice_panel.view, ui_font_scale)
+        scale_control_fonts(translation_panel.view, ui_font_scale)
         scale_control_fonts(content_area, ui_font_scale)
 
         spacer.width = max(12, int(round(15 * ui_font_scale)))
@@ -95,6 +100,7 @@ def main(page: ft.Page):
         assessment_panel.set_languages(languages)
         practice_panel.set_languages(languages)
         lesson_panel.set_languages(languages)
+        translation_panel.set_languages(languages)
         save_enabled_languages(languages)
         page.update()
 
@@ -135,6 +141,8 @@ def main(page: ft.Page):
             content_area.content = practice_panel.view
         elif mode == "lesson":
             content_area.content = lesson_panel.view
+        elif mode == "translation":
+            content_area.content = translation_panel.view
         elif mode == "settings":
             content_area.content = settings_panel.view
         else:
@@ -196,12 +204,17 @@ def main(page: ft.Page):
     lesson_panel._submit_btn.on_click = lesson_service.on_submit
     lesson_panel._reset_btn.on_click = lesson_service.on_reset
 
+    translation_service = TranslationService(translation_panel, page)
+    translation_panel._translate_btn.on_click = translation_service.on_translate
+
     def on_keyboard(e: ft.KeyboardEvent):
         if e.ctrl and e.key == "Enter":
             if _active_mode == "grammar":
                 asyncio.create_task(assessment_service.on_assess(e))
             elif _active_mode == "lesson":
                 lesson_service.on_next(e)
+            elif _active_mode == "translation":
+                asyncio.create_task(translation_service.on_translate(e))
 
     page.on_keyboard_event = on_keyboard
 
