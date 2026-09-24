@@ -1,7 +1,8 @@
 # LangAdvisor
 
 A desktop GUI or web application providing a fun toolkit for polyglots out there, including grammar assessment, practice and translation. Leverages local LLMs via [Ollama](https://docs.ollama.com/) for enhanced privacy, or cloud
-LLMs via [Ollama Cloud](https://docs.ollama.com/cloud) service. Free-tier cloud LLMs such as [minimax-m3](https://ollama.com/library/minimax-m3) and [gemma4-31b](https://ollama.com/library/gemma4) work well for most uses, though any tool-enabled LLM should work.
+LLMs via [Ollama Cloud](https://docs.ollama.com/cloud) service. See the Models section below for details on what available models work best. 
+
 
 ## Features
 
@@ -29,7 +30,31 @@ Virtually any major language is supported, including ancient languages, and you 
 
 - Python 3.10+
 - [uv](https://docs.astral.sh/uv/getting-started/installation/) 
-- [Ollama](https://ollama.com/) running locally with a model available (e.g. `ollama pull llama3.2`)
+- [Ollama](https://ollama.com/) 
+
+## Models
+
+Cloud or local models should both work without issue, depending on whether you want to run with your own hardware or a Ollama
+Cloud account.
+
+### Free Tier
+
+Within the free tier:
+
+* [gemma4-31b](https://ollama.com/library/gemma4) is the best combination of accuracy and speed
+* [nemotron-super](https://ollama.com/library/nemotron-3-super) and ultra may provide better results, but appear to run quite a bit slower on Ollama Cloud
+* [gpt-oss:120b](https://ollama.com/library/gpt-oss:120b) is also a viable alternative
+
+
+### Paid Tier
+
+For better results, particularly with less common languages, paid tier models are available. Ollama recently added a "Usage credits" feature that functions as pay-as-you-go, allowing you to add as little as $5 to your account. This makes mid-tier models affordable for everyday use, without committing to a $20+ monthly subscription.
+
+A convenient price list is [available here](https://allaimodel.com/providers/ollama-cloud) for the models currently available. 
+
+[minimax-m3](https://ollama.com/library/minimax-m3) and [GLM-5.3-Flash](https://ollama.com/library/glm-5.3-flash) provide good value and performance.
+
+
 
 ## Running
 
