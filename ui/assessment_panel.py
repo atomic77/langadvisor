@@ -3,31 +3,30 @@
 import flet as ft
 
 from core.languages import DEFAULT_ENABLED_LANGUAGES
+from ui.controls import formality_dropdown, language_dropdown, set_dropdown_languages
+from ui.responsive import (
+    responsive_container,
+    bind_responsive_container,
+    responsive_button_row,
+)
 
 TEXTFIELD_BORDER_COLOR = ft.Colors.OUTLINE
 TEXTFIELD_FOCUSED_BORDER_COLOR = ft.Colors.PRIMARY
+
+# Responsive widths
+INPUT_WIDTH_DESKTOP = 580
+INPUT_WIDTH_TABLET = 520
+INPUT_WIDTH_PHONE = None  # Full width on phone
 
 
 class AssessmentPanel:
     """Encapsulates the text input, controls, and result displays."""
 
-    def __init__(self, on_assess_click, on_text_change, on_keyboard):
-        self._lang_dropdown = ft.Dropdown(
-            label="Language",
-            width=150,
-            value="Serbian",
-            options=[ft.dropdown.Option(lang, lang) for lang in DEFAULT_ENABLED_LANGUAGES],
+    def __init__(self, on_text_change=None):
+        self._lang_dropdown = language_dropdown(
+            DEFAULT_ENABLED_LANGUAGES, width=150, value="Serbian"
         )
-        self._formality_dropdown = ft.Dropdown(
-            label="Formality",
-            width=150,
-            value="Colloquial",
-            options=[
-                ft.dropdown.Option("Colloquial", "Colloquial"),
-                ft.dropdown.Option("Business", "Business"),
-                ft.dropdown.Option("Formal", "Formal"),
-            ],
-        )
+        self._formality_dropdown = formality_dropdown(width=150)
         self._assess_btn = ft.Button("Assess", icon=ft.icons.Icons.CHECK, width=130)
         self._assessing_indicator = ft.ProgressRing(
             width=20, height=20, visible=False, stroke_width=2
@@ -37,9 +36,11 @@ class AssessmentPanel:
             value="", size=15, visible=False, weight=ft.FontWeight.W_500
         )
         self._feedback_text = ft.Text(value="", size=13, selectable=True)
-        self._feedback_box = ft.Container(
+        self._feedback_box = responsive_container(
+            width_desktop=INPUT_WIDTH_DESKTOP,
+            width_tablet=INPUT_WIDTH_TABLET,
+            width_phone=INPUT_WIDTH_PHONE,
             content=ft.Column(controls=[self._feedback_text], scroll=ft.ScrollMode.AUTO),
-            width=580,
             height=120,
             visible=False,
             border=ft.Border.all(1, ft.Colors.RED_200),
@@ -51,13 +52,18 @@ class AssessmentPanel:
             multiline=True,
             min_lines=2,
             max_lines=5,
-            width=580,
             read_only=True,
             visible=False,
             border_color=TEXTFIELD_BORDER_COLOR,
             focused_border_color=TEXTFIELD_FOCUSED_BORDER_COLOR,
             border_width=1.2,
             focused_border_width=1.8,
+        )
+        self._suggestion_box_container = responsive_container(
+            width_desktop=INPUT_WIDTH_DESKTOP,
+            width_tablet=INPUT_WIDTH_TABLET,
+            width_phone=INPUT_WIDTH_PHONE,
+            content=self._suggestion_box,
         )
 
         self._txt_input = ft.TextField(
@@ -66,7 +72,6 @@ class AssessmentPanel:
             multiline=True,
             min_lines=10,
             max_lines=20,
-            width=580,
             text_size=14,
             on_change=on_text_change,
             border_color=TEXTFIELD_BORDER_COLOR,
@@ -74,30 +79,31 @@ class AssessmentPanel:
             border_width=1.2,
             focused_border_width=1.8,
         )
+        self._txt_input_container = responsive_container(
+            width_desktop=INPUT_WIDTH_DESKTOP,
+            width_tablet=INPUT_WIDTH_TABLET,
+            width_phone=INPUT_WIDTH_PHONE,
+            content=self._txt_input,
+        )
 
-        self._assess_btn.on_click = on_assess_click
+        # Control rows with responsive wrapping
+        self._lang_row = responsive_button_row(
+            controls=[self._lang_dropdown, self._formality_dropdown],
+            spacing=15,
+        )
+        self._action_row = responsive_button_row(
+            controls=[self._assess_btn, self._assessing_indicator],
+            spacing=15,
+        )
 
         self.view = ft.Column(
             controls=[
-                self._txt_input,
-                ft.Row(
-                    controls=[self._lang_dropdown, self._formality_dropdown],
-                    alignment=ft.MainAxisAlignment.START,
-                    width=580,
-                    spacing=15,
-                ),
-                ft.Row(
-                    controls=[
-                        self._assess_btn,
-                        self._assessing_indicator,
-                    ],
-                    alignment=ft.MainAxisAlignment.START,
-                    width=580,
-                    spacing=15,
-                ),
+                self._txt_input_container,
+                self._lang_row,
+                self._action_row,
                 self._grammar_result,
                 self._feedback_box,
-                self._suggestion_box,
+                self._suggestion_box_container,
             ],
             expand=True,
             spacing=10,
@@ -129,11 +135,6 @@ class AssessmentPanel:
     def selected_formality(self, value: str) -> None:
         self._formality_dropdown.value = value
 
-    @property
-    def selected_model(self) -> str:
-        # Model selection now comes from Settings (global default).
-        return ""
-
     # -- assessment state --
 
     def set_assessing(self, assessing: bool) -> None:
@@ -146,19 +147,9 @@ class AssessmentPanel:
             self._assess_btn.icon = ft.icons.Icons.CHECK
             self._assess_btn.disabled = False
 
-    def disable_assess_button(self) -> None:
-        self._assess_btn.disabled = True
-
     def set_languages(self, languages: list[str]) -> None:
         """Replace available languages and keep a valid selected value."""
-        current = self._lang_dropdown.value
-        self._lang_dropdown.options = [ft.dropdown.Option(lang, lang) for lang in languages]
-        if current in languages:
-            self._lang_dropdown.value = current
-        elif languages:
-            self._lang_dropdown.value = languages[0]
-        else:
-            self._lang_dropdown.value = None
+        set_dropdown_languages(self._lang_dropdown, languages)
 
     # -- results --
 
@@ -192,3 +183,9 @@ class AssessmentPanel:
         self._feedback_box.visible = False
         self._suggestion_box.value = ""
         self._suggestion_box.visible = False
+
+    def bind_page(self, page: ft.Page) -> None:
+        """Bind responsive containers to page resize events."""
+        bind_responsive_container(page, self._txt_input_container)
+        bind_responsive_container(page, self._feedback_box)
+        bind_responsive_container(page, self._suggestion_box_container)

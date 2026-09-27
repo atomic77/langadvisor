@@ -11,6 +11,19 @@ _default_model = None
 
 PracticePhrase = tuple[str, str] | tuple[str, str, str]
 
+
+def phrase_text(phrase: tuple[str, ...]) -> str:
+    return phrase[0] if len(phrase) > 0 else ""
+
+
+def phrase_reference(phrase: tuple[str, ...]) -> str:
+    return phrase[1] if len(phrase) > 1 else ""
+
+
+def phrase_romanization(phrase: tuple[str, ...]) -> str:
+    return phrase[2] if len(phrase) > 2 else ""
+
+
 _ROMANIZATION_SCHEMES = {
     "Mandarin Chinese": "Hanyu Pinyin with tone marks",
     "Hindi": "IAST",
@@ -115,7 +128,7 @@ async def get_feedback_and_suggestion(
     try:
         result = await llm.ainvoke(messages)
         content = result.content.strip()
-        feedback, suggestion = _parse_feedback_suggestion(content, language)
+        feedback, suggestion = _parse_feedback_suggestion(content)
         if not feedback and not suggestion:
             feedback = content
         return feedback, suggestion
@@ -125,24 +138,36 @@ async def get_feedback_and_suggestion(
         return f"Error: {e}", ""
 
 
-def _parse_feedback_suggestion(content: str, language: str) -> tuple[str, str]:
-    """Parse FEEDBACK:/SUGGESTION: blocks that may span multiple lines."""
-    feedback = ""
-    suggestion = ""
-    current_field = None
+def _parse_labeled_blocks(content: str, fields: list[str]) -> dict[str, str]:
+    """Parse single-block FIELD: value sections that may span multiple lines.
+
+    `fields` are lowercase field names. Each field's value accumulates
+    continuation lines (joined with newlines); the result is stripped. Missing
+    fields map to "".
+    """
+    upper_fields = [f.upper() for f in fields]
+    out = {f: "" for f in upper_fields}
+    current: str | None = None
     for line in content.splitlines():
         upper = line.upper()
-        if upper.startswith("FEEDBACK:"):
-            current_field = "feedback"
-            feedback = line[len("FEEDBACK:") :].strip()
-        elif upper.startswith("SUGGESTION:"):
-            current_field = "suggestion"
-            suggestion = line[len("SUGGESTION:") :].strip()
-        elif current_field == "feedback":
-            feedback = feedback + "\n" + line if feedback else line.strip()
-        elif current_field == "suggestion":
-            suggestion = suggestion + "\n" + line if suggestion else line.strip()
-    return feedback.strip(), suggestion.strip()
+        for f in upper_fields:
+            if upper.startswith(f + ":"):
+                current = f
+                out[f] = line[len(f) + 1 :].strip()
+                break
+        else:
+            if current is not None:
+                if out[current]:
+                    out[current] = out[current] + "\n" + line
+                else:
+                    out[current] = line.strip()
+    return {f.lower(): out[f].strip() for f in upper_fields}
+
+
+def _parse_feedback_suggestion(content: str) -> tuple[str, str]:
+    """Parse FEEDBACK:/SUGGESTION: blocks that may span multiple lines."""
+    blocks = _parse_labeled_blocks(content, ["feedback", "suggestion"])
+    return blocks["feedback"], blocks["suggestion"]
 
 
 async def check_grammar(
@@ -360,13 +385,20 @@ async def translate_text(
         return [(f"Error: {e}", "error")]
 
 
-def _parse_translations(
-    content: str, expected_count: int
-) -> list[tuple[str, str]]:
-    """Parse a numbered TRANSLATION/TAG list from model output."""
-    fields = "TRANSLATION|TAG"
-    numbered = re.compile(rf"^\s*(\d+)\.\s*({fields})\s*:\s*(.*)$", re.IGNORECASE)
-    unnumbered = re.compile(rf"^\s*({fields})\s*:\s*(.*)$", re.IGNORECASE)
+def _parse_numbered(
+    content: str, fields: list[str], expected_count: int, required_field: str
+) -> list[dict[str, str]]:
+    """Parse a numbered FIELD: value list from model output.
+
+    `fields` are lowercase field names; `required_field` is the field that must
+    be non-empty for a slot to be emitted. Returns one slot dict per index
+    1..expected_count (in order) whose required field is non-empty. Handles
+    unnumbered `FIELD:` continuation lines and bare continuation lines that
+    append to the most recent (index, field).
+    """
+    fields_alt = "|".join(f.upper() for f in fields)
+    numbered = re.compile(rf"^\s*(\d+)\.\s*({fields_alt})\s*:\s*(.*)$", re.IGNORECASE)
+    unnumbered = re.compile(rf"^\s*({fields_alt})\s*:\s*(.*)$", re.IGNORECASE)
     by_index: dict[int, dict[str, str]] = {}
     current_idx: int | None = None
     current_field: str | None = None
@@ -376,7 +408,7 @@ def _parse_translations(
             idx = int(m.group(1))
             field = m.group(2).lower()
             value = m.group(3).strip()
-            slot = by_index.setdefault(idx, {"translation": "", "tag": ""})
+            slot = by_index.setdefault(idx, {f: "" for f in fields})
             slot[field] = value
             current_idx = idx
             current_field = field
@@ -385,31 +417,33 @@ def _parse_translations(
         if u and current_idx is not None:
             field = u.group(1).lower()
             value = u.group(2).strip()
-            slot = by_index.setdefault(
-                current_idx, {"translation": "", "tag": ""}
-            )
+            slot = by_index.setdefault(current_idx, {f: "" for f in fields})
             slot[field] = value
             current_field = field
             continue
         # Continuation line - attach to the most recent (index, field).
         if current_idx is not None and current_field is not None and line.strip():
-            slot = by_index.setdefault(
-                current_idx, {"translation": "", "tag": ""}
-            )
+            slot = by_index.setdefault(current_idx, {f: "" for f in fields})
             existing = slot.get(current_field, "")
             slot[current_field] = (
                 (existing + "\n" + line.strip()).strip() if existing else line.strip()
             )
-    out: list[tuple[str, str]] = []
+    out: list[dict[str, str]] = []
     for i in range(1, expected_count + 1):
         slot = by_index.get(i)
         if slot is None:
             continue
-        translation = slot.get("translation", "").strip()
-        tag = slot.get("tag", "").strip()
-        if translation:
-            out.append((translation, tag))
+        if slot.get(required_field, "").strip():
+            out.append(slot)
     return out
+
+
+def _parse_translations(
+    content: str, expected_count: int
+) -> list[tuple[str, str]]:
+    """Parse a numbered TRANSLATION/TAG list from model output."""
+    slots = _parse_numbered(content, ["translation", "tag"], expected_count, "translation")
+    return [(s["translation"].strip(), s["tag"].strip()) for s in slots]
 
 
 def _romanization_instruction(language: str) -> str:
@@ -433,44 +467,15 @@ def _parse_phrase_translation(
     content: str, include_romanization: bool = False
 ) -> PracticePhrase:
     """Parse PHRASE:/TRANSLATION:/ROMANIZATION: blocks that may span multiple lines."""
-    phrase = ""
-    translation = ""
-    romanization = ""
-    current_field = None
-    for line in content.splitlines():
-        upper = line.upper()
-        if upper.startswith("PHRASE:"):
-            current_field = "phrase"
-            phrase = line[len("PHRASE:") :].strip()
-        elif upper.startswith("TRANSLATION:"):
-            current_field = "translation"
-            translation = line[len("TRANSLATION:") :].strip()
-        elif upper.startswith("ROMANIZATION:"):
-            current_field = "romanization"
-            romanization = line[len("ROMANIZATION:") :].strip()
-        elif current_field == "phrase":
-            phrase = phrase + "\n" + line if phrase else line.strip()
-        elif current_field == "translation":
-            translation = translation + "\n" + line if translation else line.strip()
-        elif current_field == "romanization":
-            romanization = romanization + "\n" + line if romanization else line.strip()
+    blocks = _parse_labeled_blocks(content, ["phrase", "translation", "romanization"])
     if include_romanization:
-        return phrase.strip(), translation.strip(), romanization.strip()
-    return phrase.strip(), translation.strip()
+        return blocks["phrase"], blocks["translation"], blocks["romanization"]
+    return blocks["phrase"], blocks["translation"]
 
 
 def _parse_mistakes(content: str) -> str:
     """Parse a MISTAKES: block that may span multiple lines."""
-    mistakes = ""
-    in_mistakes = False
-    for line in content.splitlines():
-        upper = line.upper()
-        if upper.startswith("MISTAKES:"):
-            in_mistakes = True
-            mistakes = line[len("MISTAKES:") :].strip()
-        elif in_mistakes:
-            mistakes = mistakes + "\n" + line if mistakes else line.strip()
-    return mistakes.strip()
+    return _parse_labeled_blocks(content, ["mistakes"])["mistakes"]
 
 
 async def generate_practice_set(
@@ -608,58 +613,14 @@ def _parse_practice_set(
     content: str, expected_count: int, include_romanization: bool = False
 ) -> list[PracticePhrase]:
     """Parse a numbered PHRASE/TRANSLATION/ROMANIZATION list from model output."""
-    fields = "PHRASE|TRANSLATION|ROMANIZATION"
-    numbered = re.compile(rf"^\s*(\d+)\.\s*({fields})\s*:\s*(.*)$", re.IGNORECASE)
-    unnumbered = re.compile(rf"^\s*({fields})\s*:\s*(.*)$", re.IGNORECASE)
-    by_index: dict[int, dict[str, str]] = {}
-    current_idx: int | None = None
-    current_field: str | None = None
-    for line in content.splitlines():
-        m = numbered.match(line)
-        if m:
-            idx = int(m.group(1))
-            field = m.group(2).lower()
-            value = m.group(3).strip()
-            slot = by_index.setdefault(
-                idx, {"phrase": "", "translation": "", "romanization": ""}
-            )
-            slot[field] = value
-            current_idx = idx
-            current_field = field
-            continue
-        u = unnumbered.match(line)
-        if u and current_idx is not None:
-            field = u.group(1).lower()
-            value = u.group(2).strip()
-            slot = by_index.setdefault(
-                current_idx, {"phrase": "", "translation": "", "romanization": ""}
-            )
-            slot[field] = value
-            current_field = field
-            continue
-        # Continuation line - attach to the most recent (index, field).
-        if current_idx is not None and current_field is not None and line.strip():
-            slot = by_index.setdefault(
-                current_idx, {"phrase": "", "translation": "", "romanization": ""}
-            )
-            existing = slot.get(current_field, "")
-            slot[current_field] = (
-                (existing + "\n" + line.strip()).strip() if existing else line.strip()
-            )
-    out: list[PracticePhrase] = []
-    for i in range(1, expected_count + 1):
-        slot = by_index.get(i)
-        if slot is None:
-            continue
-        phrase = slot.get("phrase", "").strip()
-        translation = slot.get("translation", "").strip()
-        romanization = slot.get("romanization", "").strip()
-        if phrase:
-            if include_romanization:
-                out.append((phrase, translation, romanization))
-            else:
-                out.append((phrase, translation))
-    return out
+    fields = ["phrase", "translation", "romanization"]
+    slots = _parse_numbered(content, fields, expected_count, "phrase")
+    if include_romanization:
+        return [
+            (s["phrase"].strip(), s["translation"].strip(), s["romanization"].strip())
+            for s in slots
+        ]
+    return [(s["phrase"].strip(), s["translation"].strip()) for s in slots]
 
 
 def _parse_grade_batch(

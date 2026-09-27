@@ -1,22 +1,25 @@
-"""Translation panel — input on the left, N translation variants on the right."""
+"""Translation panel — input and translation variants in a responsive layout."""
 
 import flet as ft
 
 from core.languages import DEFAULT_ENABLED_LANGUAGES
+from ui.controls import formality_dropdown, language_dropdown, set_dropdown_languages
+from ui.responsive import register_resize_handler
 
 TEXTFIELD_BORDER_COLOR = ft.Colors.OUTLINE
 TEXTFIELD_FOCUSED_BORDER_COLOR = ft.Colors.PRIMARY
 
 AUTO_DETECT = "Auto-detect"
-DEFAULT_VARIATION_COUNT = 3
+DEFAULT_VARIATION_COUNT = 5
 MIN_VARIATION_COUNT = 1
 MAX_VARIATION_COUNT = 10
-
 
 class TranslationPanel:
     """Encapsulates source text, language/formality/count selectors, and a results column."""
 
     def __init__(self):
+        self._page: ft.Page | None = None
+        self._stacked = False
         # --- Input column (left) ---
         self._txt_input = ft.TextField(
             label="Text to translate…",
@@ -24,7 +27,6 @@ class TranslationPanel:
             multiline=True,
             min_lines=6,
             max_lines=12,
-            width=380,
             text_size=14,
             border_color=TEXTFIELD_BORDER_COLOR,
             focused_border_color=TEXTFIELD_FOCUSED_BORDER_COLOR,
@@ -40,22 +42,10 @@ class TranslationPanel:
             options=[ft.dropdown.Option(AUTO_DETECT, AUTO_DETECT)]
             + [ft.dropdown.Option(lang, lang) for lang in DEFAULT_ENABLED_LANGUAGES],
         )
-        self._target_lang_dropdown = ft.Dropdown(
-            label="To",
-            width=180,
-            value="English",
-            options=[ft.dropdown.Option(lang, lang) for lang in DEFAULT_ENABLED_LANGUAGES],
+        self._target_lang_dropdown = language_dropdown(
+            DEFAULT_ENABLED_LANGUAGES, width=180, value="English"
         )
-        self._formality_dropdown = ft.Dropdown(
-            label="Formality",
-            width=180,
-            value="Colloquial",
-            options=[
-                ft.dropdown.Option("Colloquial", "Colloquial"),
-                ft.dropdown.Option("Business", "Business"),
-                ft.dropdown.Option("Formal", "Formal"),
-            ],
-        )
+        self._formality_dropdown = formality_dropdown(width=180)
         self._count_field = ft.TextField(
             label="Variations",
             value=str(DEFAULT_VARIATION_COUNT),
@@ -106,8 +96,8 @@ class TranslationPanel:
             padding=10,
         )
 
-        # --- Layout: left inputs + right results ---
-        left_column = ft.Container(
+        # --- Build the two content columns (independent of layout) ---
+        self._left_column = ft.Container(
             content=ft.Column(
                 controls=[
                     ft.Text("Translation Mode", size=20, weight=ft.FontWeight.W_600),
@@ -138,7 +128,7 @@ class TranslationPanel:
             width=400,
             padding=ft.padding.Padding(right=8, top=0, left=0, bottom=0),
         )
-        right_column = ft.Column(
+        self._right_column = ft.Column(
             controls=[
                 self._results_header,
                 ft.Container(height=6),
@@ -148,12 +138,42 @@ class TranslationPanel:
             spacing=4,
         )
 
-        self.view = ft.Row(
-            controls=[left_column, right_column],
+        # --- Responsive root: Row (landscape/desktop) or Column (portrait) ---
+        self._root_row = ft.Row(
+            controls=[self._left_column, self._right_column],
             expand=True,
             vertical_alignment=ft.CrossAxisAlignment.START,
             spacing=12,
         )
+        self._root_column = ft.Column(
+            controls=[self._left_column, self._right_column],
+            expand=True,
+            spacing=16,
+            scroll=ft.ScrollMode.AUTO,
+        )
+        self.view = ft.Container(content=self._root_row, expand=True)
+
+    def bind_page(self, page: ft.Page) -> None:
+        """Attach page reference and register resize handler."""
+        self._page = page
+        register_resize_handler(page, self._on_resize)
+        self._apply_layout(page.width, page.height)
+
+    def _on_resize(self, e: ft.PageResizeEvent) -> None:
+        self._apply_layout(e.width, e.height)
+
+    def _apply_layout(self, width: float, height: float) -> None:
+        """Stack columns when the page cannot fit both panels side by side."""
+        if width <= 0 or height <= 0:
+            return
+        stacked = width < 900
+        if stacked != self._stacked:
+            self._stacked = stacked
+            self.view.content = self._root_column if stacked else self._root_row
+            self._left_column.width = None if stacked else 400
+            self._right_column.expand = not stacked
+            self._results_box.expand = not stacked
+            self._results_box.height = 260 if stacked else None
 
     # -- properties exposed for the service --
 
@@ -182,11 +202,6 @@ class TranslationPanel:
             return DEFAULT_VARIATION_COUNT
         return max(MIN_VARIATION_COUNT, min(MAX_VARIATION_COUNT, n))
 
-    @property
-    def selected_model(self) -> str:
-        # Model selection now comes from Settings (global default).
-        return ""
-
     # -- state --
 
     def set_translating(self, translating: bool) -> None:
@@ -198,9 +213,6 @@ class TranslationPanel:
             self._translate_btn.text = "Translate"
             self._translate_btn.icon = ft.icons.Icons.TRANSLATE
             self._translate_btn.disabled = False
-
-    def disable_translate_button(self) -> None:
-        self._translate_btn.disabled = True
 
     def set_languages(self, languages: list[str]) -> None:
         """Rebuild source/target dropdowns while preserving valid selections.
@@ -216,22 +228,11 @@ class TranslationPanel:
         )
         if current_source == AUTO_DETECT or current_source in languages:
             self._source_lang_dropdown.value = current_source
-        elif languages:
-            self._source_lang_dropdown.value = AUTO_DETECT
         else:
             self._source_lang_dropdown.value = AUTO_DETECT
 
         # Target dropdown.
-        current_target = self._target_lang_dropdown.value
-        self._target_lang_dropdown.options = [
-            ft.dropdown.Option(lang, lang) for lang in languages
-        ]
-        if current_target in languages:
-            self._target_lang_dropdown.value = current_target
-        elif languages:
-            self._target_lang_dropdown.value = languages[0]
-        else:
-            self._target_lang_dropdown.value = None
+        set_dropdown_languages(self._target_lang_dropdown, languages)
 
     # -- results --
 

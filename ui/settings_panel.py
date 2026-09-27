@@ -3,6 +3,12 @@
 import flet as ft
 
 from ui.typography import clamp_font_scale, scale_control_fonts
+from ui.responsive import (
+    responsive_container,
+    bind_responsive_container,
+    responsive_button_row,
+    BP_TABLET_PORTRAIT_MAX,
+)
 
 FONT_FAMILY_OPTIONS: list[tuple[str, str]] = [
     ("System default", ""),
@@ -34,16 +40,26 @@ class SettingsPanel:
         self._model_status = ft.Text(value="Loading models...", size=11, color=ft.Colors.GREY)
         self._default_model_dropdown = ft.Dropdown(
             label="Default model",
-            width=300,
             on_select=lambda e: on_default_model_change(e.control.value or ""),
+        )
+        self._default_model_dropdown_container = responsive_container(
+            width_desktop=300,
+            width_tablet=280,
+            width_phone=None,
+            content=self._default_model_dropdown,
         )
 
         self._font_family_dropdown = ft.Dropdown(
             label="Font type",
-            width=220,
             options=[ft.dropdown.Option(token, label) for label, token in FONT_FAMILY_OPTIONS],
             value="",
             on_select=lambda e: self._on_font_family_change(e.control.value or ""),
+        )
+        self._font_family_dropdown_container = responsive_container(
+            width_desktop=220,
+            width_tablet=200,
+            width_phone=None,
+            content=self._font_family_dropdown,
         )
         self._font_scale_label = ft.Text(value="Font size: 100%", size=12, color=ft.Colors.GREY)
         self._font_scale_slider = ft.Slider(
@@ -51,9 +67,14 @@ class SettingsPanel:
             max=1.6,
             divisions=14,
             value=1.0,
-            width=220,
             on_change=lambda e: self._set_scale_label(float(e.control.value or 1.0)),
             on_change_end=lambda e: self._on_font_scale_change(float(e.control.value or 1.0)),
+        )
+        self._font_scale_slider_container = responsive_container(
+            width_desktop=220,
+            width_tablet=200,
+            width_phone=None,
+            content=self._font_scale_slider,
         )
 
         self._languages_summary = ft.Text(size=12, color=ft.Colors.GREY)
@@ -73,11 +94,9 @@ class SettingsPanel:
                     color=ft.Colors.GREY,
                 ),
                 ft.Container(height=8),
-                ft.Row(
-                    controls=[self._default_model_dropdown, self._model_status],
+                responsive_button_row(
+                    controls=[self._default_model_dropdown_container, self._model_status],
                     spacing=15,
-                    alignment=ft.MainAxisAlignment.START,
-                    wrap=True,
                 ),
                 ft.Container(height=20),
                 ft.Text("Accessibility", size=14, weight=ft.FontWeight.W_600),
@@ -86,11 +105,9 @@ class SettingsPanel:
                     size=12,
                     color=ft.Colors.GREY,
                 ),
-                ft.Row(
-                    controls=[self._font_family_dropdown, self._font_scale_slider],
+                responsive_button_row(
+                    controls=[self._font_family_dropdown_container, self._font_scale_slider_container],
                     spacing=15,
-                    alignment=ft.MainAxisAlignment.START,
-                    wrap=True,
                 ),
                 self._font_scale_label,
                 ft.Container(height=20),
@@ -111,14 +128,6 @@ class SettingsPanel:
 
     def bind_page(self, page: ft.Page) -> None:
         self._page = page
-
-    @property
-    def selected_default_model(self) -> str:
-        return self._default_model_dropdown.value or ""
-
-    @selected_default_model.setter
-    def selected_default_model(self, value: str) -> None:
-        self._default_model_dropdown.value = value
 
     def set_model_status(self, message: str, is_error: bool = False) -> None:
         self._model_status.value = message
@@ -149,10 +158,15 @@ class SettingsPanel:
 
     def apply_typography(self, scale: float) -> None:
         self._font_scale = clamp_font_scale(scale)
-        self._default_model_dropdown.width = int(300 + (self._font_scale - 1.0) * 100)
-        self._font_family_dropdown.width = int(220 + (self._font_scale - 1.0) * 80)
-        self._font_scale_slider.width = int(220 + (self._font_scale - 1.0) * 80)
+        # Widths are now handled by responsive_container based on viewport
         scale_control_fonts(self.view, self._font_scale)
+
+    def bind_page(self, page: ft.Page) -> None:
+        """Bind responsive containers to page resize events."""
+        self._page = page
+        bind_responsive_container(page, self._default_model_dropdown_container)
+        bind_responsive_container(page, self._font_family_dropdown_container)
+        bind_responsive_container(page, self._font_scale_slider_container)
 
     def set_selected_languages(self, languages: list[str]) -> None:
         valid = [lang for lang in languages if lang in self._all_languages]
@@ -248,6 +262,12 @@ class SettingsPanel:
 
         search_field.on_change = lambda _: (render_list(), self._page.update())
 
+        # Dialog width: responsive based on viewport
+        dialog_width = 460
+        if self._page and self._page.width > 0:
+            if self._page.width <= BP_TABLET_PORTRAIT_MAX:
+                dialog_width = min(460, self._page.width - 40)
+
         dialog.title = ft.Text("Available languages")
         dialog.content = ft.Container(
             content=ft.Column(
@@ -262,9 +282,9 @@ class SettingsPanel:
                     checklist,
                 ],
                 spacing=8,
-                width=460,
+                width=dialog_width,
             ),
-            width=460,
+            width=dialog_width,
             height=430,
         )
         dialog.actions = [

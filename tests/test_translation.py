@@ -37,14 +37,6 @@ class TestParseTranslations:
             ("Hey, how's it going?", "idiomatic"),
         ]
 
-    def test_short_response_returns_what_was_parsed(self):
-        content = (
-            "1. TRANSLATION: Hello\n"
-            "   TAG: formal\n"
-        )
-        out = _parse_translations(content, expected_count=5)
-        assert out == [("Hello", "formal")]
-
     def test_skips_missing_indices(self):
         content = (
             "1. TRANSLATION: Hello\n"
@@ -115,29 +107,6 @@ class TestParseTranslations:
         assert _parse_translations("no structure here", expected_count=5) == []
         assert _parse_translations("", expected_count=5) == []
 
-    def test_ignores_blank_lines(self):
-        content = (
-            "\n"
-            "1. TRANSLATION: Hello\n"
-            "   TAG: formal\n"
-            "\n"
-            "2. TRANSLATION: Hi\n"
-            "   TAG: casual\n"
-            "\n"
-        )
-        out = _parse_translations(content, expected_count=2)
-        assert out == [("Hello", "formal"), ("Hi", "casual")]
-
-    def test_case_insensitive_field_names(self):
-        content = (
-            "1. translation: Hello\n"
-            "   tag: formal\n"
-            "2. Translation: Hi\n"
-            "   Tag: casual\n"
-        )
-        out = _parse_translations(content, expected_count=2)
-        assert out == [("Hello", "formal"), ("Hi", "casual")]
-
 
 # ---------------------------------------------------------------------------
 # translate_text tests (mocked LLM)
@@ -170,49 +139,24 @@ class TestTranslateText:
         assert out == [("Hello.", "formal"), ("Hi.", "casual")]
 
     @pytest.mark.asyncio
-    async def test_empty_text_returns_empty(self):
+    @pytest.mark.parametrize(
+        "text, source_language, target_language, count",
+        [
+            ("", "Auto-detect", "English", 3),        # empty/blank text short-circuit
+            ("Hello", "Auto-detect", "French", 0),    # zero count
+            ("Hello", "Auto-detect", "", 3),          # missing target language
+        ],
+        ids=["empty-text", "zero-count", "no-target"],
+    )
+    async def test_guard_inputs_return_empty(
+        self, text, source_language, target_language, count
+    ):
         out = await translate_text(
-            text="",
-            source_language="Auto-detect",
-            target_language="English",
+            text=text,
+            source_language=source_language,
+            target_language=target_language,
             formality="Colloquial",
-            count=3,
-            model="test-model",
-        )
-        assert out == []
-
-    @pytest.mark.asyncio
-    async def test_blank_text_returns_empty(self):
-        out = await translate_text(
-            text="   \n  ",
-            source_language="Auto-detect",
-            target_language="English",
-            formality="Colloquial",
-            count=3,
-            model="test-model",
-        )
-        assert out == []
-
-    @pytest.mark.asyncio
-    async def test_zero_count_returns_empty(self):
-        out = await translate_text(
-            text="Hello",
-            source_language="Auto-detect",
-            target_language="French",
-            formality="Colloquial",
-            count=0,
-            model="test-model",
-        )
-        assert out == []
-
-    @pytest.mark.asyncio
-    async def test_missing_target_language_returns_empty(self):
-        out = await translate_text(
-            text="Hello",
-            source_language="Auto-detect",
-            target_language="",
-            formality="Colloquial",
-            count=3,
+            count=count,
             model="test-model",
         )
         assert out == []

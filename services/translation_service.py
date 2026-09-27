@@ -40,8 +40,7 @@ class TranslationService:
         self._panel.clear_results()
         self._page.update()
 
-        selected_model = self._panel.selected_model
-        effective_model = selected_model or (get_default_model() or "")
+        model = get_default_model() or ""
 
         self._running_task = asyncio.current_task()
         try:
@@ -51,7 +50,7 @@ class TranslationService:
                 target,
                 self._panel.selected_formality,
                 self._panel.variation_count,
-                selected_model,
+                model,
             )
             # translate_text returns a single error sentinel for ConnectError/Exception.
             if variants and variants[0][1] == "error":

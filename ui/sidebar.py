@@ -4,6 +4,7 @@ import flet as ft
 
 from core.history_store import HistoryStore
 from ui.typography import clamp_font_scale, scale_control_fonts
+from ui.responsive import is_mobile_viewport, ResponsiveSidebarManager
 
 
 class Sidebar:
@@ -15,6 +16,7 @@ class Sidebar:
         on_new: callable,
         on_load: callable,
         on_mode_change: callable = None,
+        start_collapsed: bool = False,
     ):
         self._store = store
         self._on_new = on_new
@@ -101,7 +103,7 @@ class Sidebar:
             bgcolor=ft.Colors.SURFACE_CONTAINER_LOW,
             border_radius=8,
             padding=8,
-            visible=False,
+            visible=start_collapsed,
         )
 
         header = ft.Container(
@@ -229,7 +231,7 @@ class Sidebar:
             bgcolor=ft.Colors.SURFACE_CONTAINER_LOW,
             border_radius=8,
             padding=10,
-            visible=True,
+            visible=not start_collapsed,
         )
 
         self.view = ft.Row(
@@ -238,7 +240,16 @@ class Sidebar:
             vertical_alignment=ft.CrossAxisAlignment.START,
         )
 
+        self._responsive_manager = None
         self._rebuild_history_list()
+
+    def bind_page(self, page: ft.Page) -> None:
+        """Bind sidebar to page for responsive collapse/expand behavior."""
+        self._responsive_manager = ResponsiveSidebarManager(self, page)
+        # Initial state
+        if is_mobile_viewport(page.width, page.height):
+            if not self._collapsed.visible:
+                self.toggle()
 
     def apply_typography(self, scale: float) -> None:
         self._font_scale = clamp_font_scale(scale)
@@ -267,41 +278,13 @@ class Sidebar:
             self._on_mode_change(mode)
 
     def _update_contextual_content(self) -> None:
-        if self._mode == "practice":
-            self._history_header.value = "Practice"
-            self._clear_history_btn.visible = False
-            self._history_list.visible = False
-            self._practice_stats.visible = False
-            self._practice_topics.visible = False
-            self._search_input.visible = False
-        elif self._mode == "lesson":
-            self._history_header.value = "Lesson"
-            self._clear_history_btn.visible = False
-            self._history_list.visible = False
-            self._practice_stats.visible = False
-            self._practice_topics.visible = False
-            self._search_input.visible = False
-        elif self._mode == "translation":
-            self._history_header.value = "Translation"
-            self._clear_history_btn.visible = False
-            self._history_list.visible = False
-            self._practice_stats.visible = False
-            self._practice_topics.visible = False
-            self._search_input.visible = False
-        elif self._mode == "settings":
-            self._history_header.value = "Settings"
-            self._clear_history_btn.visible = False
-            self._history_list.visible = False
-            self._practice_stats.visible = False
-            self._practice_topics.visible = False
-            self._search_input.visible = False
-        else:
-            self._history_header.value = "History"
-            self._clear_history_btn.visible = True
-            self._history_list.visible = True
-            self._practice_stats.visible = False
-            self._practice_topics.visible = False
-            self._search_input.visible = False
+        is_grammar = self._mode == "grammar"
+        self._history_header.value = "History" if is_grammar else self._mode.title()
+        self._clear_history_btn.visible = is_grammar
+        self._history_list.visible = is_grammar
+        self._practice_stats.visible = False
+        self._practice_topics.visible = False
+        self._search_input.visible = False
 
     def toggle(self) -> None:
         expanded = self._expanded.visible

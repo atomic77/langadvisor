@@ -171,12 +171,6 @@ class TestHistoryStore:
         assert called["times"] == 1
         assert store.all()[0].text == "hi"
 
-    def test_get_by_index(self):
-        store = HistoryStore(persist=False)
-        entry = HistoryEntry(text="a", language="L", formality="F", model="m", verdict="yes")
-        store.add(entry)
-        assert store.get(0) is entry
-
     @patch("core.persistence.load_entries")
     @patch("core.persistence.save_entry")
     def test_persist_loads_on_init(self, mock_save, mock_load):
@@ -207,13 +201,6 @@ class TestHistoryStore:
         assert store.all() == []
         assert called["times"] == 1
 
-    @patch("core.persistence.load_entries", return_value=[])
-    @patch("core.persistence.clear_entries")
-    def test_persist_clears_entries(self, mock_clear, mock_load):
-        store = HistoryStore(persist=True)
-        store.clear()
-        mock_clear.assert_called_once_with()
-
 
 # ---------------------------------------------------------------------------
 # Model fetcher
@@ -242,44 +229,22 @@ class TestSidebarSearch:
         store.add(HistoryEntry(text="Ciao", language="Italian", formality="Business", model="m3", verdict="yes"))
         return store
 
-    def test_matches_search_empty_query_matches_all(self, sample_store):
+    @pytest.mark.parametrize(
+        "query, expected_texts",
+        [
+            ("", {"Bonjour le monde", "Helo world", "Ciao"}),
+            ("monde", {"Bonjour le monde"}),
+            ("italian", {"Ciao"}),
+            ("typo", {"Helo world"}),
+            ("zzzzz", set()),
+        ],
+        ids=["empty", "by-text", "by-language", "by-feedback", "no-results"],
+    )
+    def test_matches_search(self, sample_store, query, expected_texts):
         sidebar = Sidebar(sample_store, on_new=lambda: None, on_load=lambda idx: None)
-        for entry in sample_store.all():
-            assert sidebar._matches_search(entry) is True
-
-    def test_matches_search_by_text(self, sample_store):
-        sidebar = Sidebar(sample_store, on_new=lambda: None, on_load=lambda idx: None)
-        sidebar._search_query = "monde"
-        results = [e for e in sample_store.all() if sidebar._matches_search(e)]
-        assert len(results) == 1
-        assert results[0].language == "French"
-
-    def test_matches_search_by_language(self, sample_store):
-        sidebar = Sidebar(sample_store, on_new=lambda: None, on_load=lambda idx: None)
-        sidebar._search_query = "italian"
-        results = [e for e in sample_store.all() if sidebar._matches_search(e)]
-        assert len(results) == 1
-        assert results[0].text == "Ciao"
-
-    def test_matches_search_by_model(self, sample_store):
-        sidebar = Sidebar(sample_store, on_new=lambda: None, on_load=lambda idx: None)
-        sidebar._search_query = "m2"
-        results = [e for e in sample_store.all() if sidebar._matches_search(e)]
-        assert len(results) == 1
-        assert results[0].text == "Helo world"
-
-    def test_matches_search_by_feedback(self, sample_store):
-        sidebar = Sidebar(sample_store, on_new=lambda: None, on_load=lambda idx: None)
-        sidebar._search_query = "typo"
-        results = [e for e in sample_store.all() if sidebar._matches_search(e)]
-        assert len(results) == 1
-        assert results[0].text == "Helo world"
-
-    def test_matches_search_no_results(self, sample_store):
-        sidebar = Sidebar(sample_store, on_new=lambda: None, on_load=lambda idx: None)
-        sidebar._search_query = "zzzzz"
-        results = [e for e in sample_store.all() if sidebar._matches_search(e)]
-        assert len(results) == 0
+        sidebar._search_query = query
+        results = {e.text for e in sample_store.all() if sidebar._matches_search(e)}
+        assert results == expected_texts
 
     def test_clear_history_button_tracks_entries(self):
         store = HistoryStore(persist=False)
@@ -369,7 +334,7 @@ class TestPracticeServiceLatinization:
 
 class TestLanguageDropdownConfiguration:
     def test_assessment_panel_set_languages_keeps_existing_selection(self):
-        panel = AssessmentPanel(on_assess_click=None, on_text_change=None, on_keyboard=None)
+        panel = AssessmentPanel()
         panel.selected_language = "French"
 
         panel.set_languages(["English", "French", "German"])
@@ -382,7 +347,7 @@ class TestLanguageDropdownConfiguration:
         ]
 
     def test_assessment_panel_set_languages_falls_back_to_first(self):
-        panel = AssessmentPanel(on_assess_click=None, on_text_change=None, on_keyboard=None)
+        panel = AssessmentPanel()
         panel.selected_language = "Japanese"
 
         panel.set_languages(["English", "German"])

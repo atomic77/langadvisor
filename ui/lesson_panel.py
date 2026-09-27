@@ -3,7 +3,20 @@
 import flet as ft
 
 from core.languages import DEFAULT_ENABLED_LANGUAGES
+from ui.controls import (
+    category_dropdown,
+    ects_dropdown,
+    formality_dropdown,
+    language_dropdown,
+    set_dropdown_languages,
+)
 from ui.typography import clamp_font_scale, scale_control_fonts
+from ui.responsive import (
+    responsive_container,
+    bind_responsive_container,
+    responsive_button_row,
+    register_resize_handler,
+)
 
 
 class LessonPanel:
@@ -14,63 +27,18 @@ class LessonPanel:
         self._meta_label_width = 110
 
         # --- Language dropdown ---
-        self._lang_dropdown = ft.Dropdown(
-            label="Language",
-            width=250,
-            value="Serbian",
-            options=[ft.dropdown.Option(lang, lang) for lang in DEFAULT_ENABLED_LANGUAGES],
+        self._lang_dropdown = language_dropdown(
+            DEFAULT_ENABLED_LANGUAGES, width=250, value="Serbian"
         )
 
         # --- Formality dropdown ---
-        self._formality_dropdown = ft.Dropdown(
-            label="Formality",
-            width=150,
-            value="Colloquial",
-            options=[
-                ft.dropdown.Option("Colloquial", "Colloquial"),
-                ft.dropdown.Option("Business", "Business"),
-                ft.dropdown.Option("Formal", "Formal"),
-            ],
-        )
+        self._formality_dropdown = formality_dropdown(width=150)
 
         # --- Category dropdown ---
-        self._category_dropdown = ft.Dropdown(
-            label="Category",
-            width=350,
-            value="Everyday Conversation",
-            options=[
-                ft.dropdown.Option("Everyday Conversation", "Everyday Conversation"),
-                ft.dropdown.Option("Travel", "Travel"),
-                ft.dropdown.Option("Food and Dining", "Food and Dining"),
-                ft.dropdown.Option("Shopping", "Shopping"),
-                ft.dropdown.Option("Work and Business", "Work and Business"),
-                ft.dropdown.Option("School and Study", "School and Study"),
-                ft.dropdown.Option("Health and Medical", "Health and Medical"),
-                ft.dropdown.Option("Family and Relationships", "Family and Relationships"),
-                ft.dropdown.Option("Technology", "Technology"),
-                ft.dropdown.Option("News and Current Events", "News and Current Events"),
-                ft.dropdown.Option("Culture and Entertainment", "Culture and Entertainment"),
-                ft.dropdown.Option("Idioms and Expressions", "Idioms and Expressions"),
-                ft.dropdown.Option("Formal Writing", "Formal Writing"),
-                ft.dropdown.Option("Customer Service", "Customer Service"),
-                ft.dropdown.Option("Emergencies", "Emergencies"),
-            ],
-        )
+        self._category_dropdown = category_dropdown(width=350)
 
         # --- ECTS dropdown ---
-        self._ects_dropdown = ft.Dropdown(
-            label="ECTS Level",
-            width=200,
-            value="A1",
-            options=[
-                ft.dropdown.Option("A1", "A1 - Beginner"),
-                ft.dropdown.Option("A2", "A2 - Elementary"),
-                ft.dropdown.Option("B1", "B1 - Intermediate"),
-                ft.dropdown.Option("B2", "B2 - Upper-Intermediate"),
-                ft.dropdown.Option("C1", "C1 - Advanced"),
-                ft.dropdown.Option("C2", "C2 - Proficient"),
-            ],
-        )
+        self._ects_dropdown = ects_dropdown(width=200)
 
         # --- Round size dropdown ---
         self._round_size_dropdown = ft.Dropdown(
@@ -125,6 +93,7 @@ class LessonPanel:
                         ],
                         alignment=ft.MainAxisAlignment.START,
                         spacing=15,
+                        wrap=True,
                     ),
                 ],
                 spacing=8,
@@ -137,7 +106,7 @@ class LessonPanel:
             value="", size=13, weight=ft.FontWeight.W_500, visible=False
         )
         self._progress_bar = ft.ProgressBar(
-            value=0, width=400, visible=False, bar_height=4
+            value=0, visible=False, bar_height=4, expand=True
         )
 
         # --- SETUP body ---
@@ -190,35 +159,43 @@ class LessonPanel:
         self._phrase_text = ft.Text(
             value="", size=22, weight=ft.FontWeight.W_500, selectable=True
         )
-        self._phrase_card = ft.Container(
-            content=self._phrase_text,
-            border=ft.Border.all(1, ft.Colors.OUTLINE),
-            border_radius=8,
-            padding=ft.padding.Padding(left=20, top=18, right=20, bottom=18),
-            bgcolor=ft.Colors.SURFACE_CONTAINER_LOWEST,
-            width=800,
+        self._phrase_card = responsive_container(
+            width_desktop=800,
+            width_tablet=600,
+            width_phone=None,
+            content=ft.Container(
+                content=self._phrase_text,
+                border=ft.Border.all(1, ft.Colors.OUTLINE),
+                border_radius=8,
+                padding=ft.padding.Padding(left=20, top=18, right=20, bottom=18),
+                bgcolor=ft.Colors.SURFACE_CONTAINER_LOWEST,
+            ),
         )
         self._romanization_text = ft.Text(
             value="", size=17, selectable=True, color=ft.Colors.BLUE_200
         )
-        self._romanization_card = ft.Container(
-            content=ft.Column(
-                controls=[
-                    ft.Text(
-                        "Latinization",
-                        size=11,
-                        weight=ft.FontWeight.W_700,
-                        color=ft.Colors.GREY,
-                    ),
-                    self._romanization_text,
-                ],
-                spacing=4,
+        self._romanization_card = responsive_container(
+            width_desktop=800,
+            width_tablet=600,
+            width_phone=None,
+            content=ft.Container(
+                content=ft.Column(
+                    controls=[
+                        ft.Text(
+                            "Latinization",
+                            size=11,
+                            weight=ft.FontWeight.W_700,
+                            color=ft.Colors.GREY,
+                        ),
+                        self._romanization_text,
+                    ],
+                    spacing=4,
+                ),
+                border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
+                border_radius=8,
+                padding=ft.padding.Padding(left=16, top=12, right=16, bottom=12),
+                bgcolor=ft.Colors.SURFACE_CONTAINER_LOW,
             ),
-            border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
-            border_radius=8,
-            padding=ft.padding.Padding(left=16, top=12, right=16, bottom=12),
-            bgcolor=ft.Colors.SURFACE_CONTAINER_LOW,
-            width=800,
             visible=False,
         )
         self._answer_input = ft.TextField(
@@ -232,7 +209,12 @@ class LessonPanel:
             focused_border_color=ft.Colors.PRIMARY,
             border_width=1.2,
             focused_border_width=1.8,
-            width=800,
+        )
+        self._answer_input_container = responsive_container(
+            width_desktop=800,
+            width_tablet=600,
+            width_phone=None,
+            content=self._answer_input,
         )
         self._reference_translation = ""
         self._reference_text = ft.Text(
@@ -241,24 +223,28 @@ class LessonPanel:
             selectable=True,
             color=ft.Colors.BLUE_200,
         )
-        self._reference_card = ft.Container(
-            content=ft.Column(
-                controls=[
-                    ft.Text(
-                        "Translation",
-                        size=11,
-                        weight=ft.FontWeight.W_700,
-                        color=ft.Colors.GREY,
-                    ),
-                    self._reference_text,
-                ],
-                spacing=4,
+        self._reference_card = responsive_container(
+            width_desktop=800,
+            width_tablet=600,
+            width_phone=None,
+            content=ft.Container(
+                content=ft.Column(
+                    controls=[
+                        ft.Text(
+                            "Translation",
+                            size=11,
+                            weight=ft.FontWeight.W_700,
+                            color=ft.Colors.GREY,
+                        ),
+                        self._reference_text,
+                    ],
+                    spacing=4,
+                ),
+                border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
+                border_radius=8,
+                padding=ft.padding.Padding(left=16, top=12, right=16, bottom=12),
+                bgcolor=ft.Colors.SURFACE_CONTAINER_LOW,
             ),
-            border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
-            border_radius=8,
-            padding=ft.padding.Padding(left=16, top=12, right=16, bottom=12),
-            bgcolor=ft.Colors.SURFACE_CONTAINER_LOW,
-            width=800,
             visible=False,
         )
         self._prev_btn = ft.Button(
@@ -284,10 +270,10 @@ class LessonPanel:
                     self._phrase_card,
                     self._romanization_card,
                     ft.Container(height=14),
-                    self._answer_input,
+                    self._answer_input_container,
                     self._reference_card,
                     ft.Container(height=14),
-                    ft.Row(
+                    responsive_button_row(
                         controls=[
                             self._prev_btn,
                             self._next_btn,
@@ -295,7 +281,6 @@ class LessonPanel:
                             self._skip_btn,
                             self._submit_btn,
                         ],
-                        alignment=ft.MainAxisAlignment.START,
                         spacing=10,
                     ),
                 ],
@@ -422,25 +407,37 @@ class LessonPanel:
 
     def set_languages(self, languages: list[str]) -> None:
         """Replace available languages and keep a valid selected value."""
-        current = self._lang_dropdown.value
-        self._lang_dropdown.options = [
-            ft.dropdown.Option(lang, lang) for lang in languages
-        ]
-        if current in languages:
-            self._lang_dropdown.value = current
-        elif languages:
-            self._lang_dropdown.value = languages[0]
-        else:
-            self._lang_dropdown.value = None
+        set_dropdown_languages(self._lang_dropdown, languages)
 
     def apply_typography(self, scale: float) -> None:
         self._font_scale = clamp_font_scale(scale)
         self._meta_label_width = int(110 + (self._font_scale - 1.0) * 70)
-        self._phrase_card.width = int(800 + (self._font_scale - 1.0) * 120)
-        self._romanization_card.width = int(800 + (self._font_scale - 1.0) * 120)
-        self._reference_card.width = int(800 + (self._font_scale - 1.0) * 120)
-        self._answer_input.width = int(800 + (self._font_scale - 1.0) * 120)
+        # Widths are now handled by responsive_container based on viewport
         scale_control_fonts(self.view, self._font_scale)
+
+    def bind_page(self, page: ft.Page) -> None:
+        """Bind responsive containers to page resize events."""
+        bind_responsive_container(page, self._phrase_card)
+        bind_responsive_container(page, self._romanization_card)
+        bind_responsive_container(page, self._answer_input_container)
+        bind_responsive_container(page, self._reference_card)
+        register_resize_handler(page, self._on_resize)
+        self._set_setup_widths(page.width)
+
+    def _on_resize(self, event: ft.PageResizeEvent) -> None:
+        self._set_setup_widths(event.width)
+
+    def _set_setup_widths(self, page_width: float) -> None:
+        # Account for page padding and the collapsed sidebar on small screens.
+        available = max(120, page_width - 140)
+        for control, preferred in (
+            (self._lang_dropdown, 250),
+            (self._formality_dropdown, 150),
+            (self._category_dropdown, 350),
+            (self._ects_dropdown, 200),
+            (self._round_size_dropdown, 130),
+        ):
+            control.width = min(preferred, available)
 
     def set_status(self, text: str, is_error: bool = False) -> None:
         self._status_text.value = text

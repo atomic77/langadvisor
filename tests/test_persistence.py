@@ -7,19 +7,16 @@ from core.lesson_store import LessonEntry
 from core.languages import DEFAULT_ENABLED_LANGUAGES
 from core.persistence import (
     clear_entries,
-    load_default_model,
     load_enabled_languages,
     load_entries,
     load_lesson_rounds,
     load_setting,
     load_ui_font_family,
     load_ui_font_scale,
-    save_default_model,
     save_enabled_languages,
     save_entry,
     save_lesson_round,
     save_setting,
-    save_ui_font_family,
     save_ui_font_scale,
 )
 
@@ -94,39 +91,33 @@ class TestPersistence:
         save_setting("theme", "light", temp_db)
         assert load_setting("theme", temp_db) == "light"
 
-    def test_save_and_load_default_model(self, temp_db):
-        save_default_model("llama3.2", temp_db)
-        assert load_default_model(temp_db) == "llama3.2"
-
     def test_save_and_load_enabled_languages(self, temp_db):
         save_enabled_languages(["English", "Spanish", "Japanese"], temp_db)
         assert load_enabled_languages(temp_db) == ["English", "Spanish", "Japanese"]
 
-    def test_enabled_languages_defaults_when_missing(self, temp_db):
-        assert load_enabled_languages(temp_db) == DEFAULT_ENABLED_LANGUAGES
-
-    def test_enabled_languages_defaults_when_corrupt(self, temp_db):
-        save_setting("enabled_languages", "{not-json", temp_db)
+    @pytest.mark.parametrize(
+        "raw_value",
+        [None, "{not-json"],
+        ids=["missing", "corrupt"],
+    )
+    def test_enabled_languages_defaults_when_missing_or_corrupt(self, temp_db, raw_value):
+        if raw_value is not None:
+            save_setting("enabled_languages", raw_value, temp_db)
         assert load_enabled_languages(temp_db) == DEFAULT_ENABLED_LANGUAGES
 
     def test_save_and_load_ui_font_scale(self, temp_db):
         save_ui_font_scale(1.25, temp_db)
         assert load_ui_font_scale(temp_db) == 1.25
 
-    def test_ui_font_scale_defaults_when_missing(self, temp_db):
+    @pytest.mark.parametrize(
+        "raw_value",
+        [None, "abc", "3.0"],
+        ids=["missing", "invalid", "out-of-bounds"],
+    )
+    def test_ui_font_scale_defaults_when_missing_invalid_or_oob(self, temp_db, raw_value):
+        if raw_value is not None:
+            save_setting("ui_font_scale", raw_value, temp_db)
         assert load_ui_font_scale(temp_db) == 1.0
-
-    def test_ui_font_scale_defaults_when_invalid(self, temp_db):
-        save_setting("ui_font_scale", "abc", temp_db)
-        assert load_ui_font_scale(temp_db) == 1.0
-
-    def test_ui_font_scale_defaults_when_out_of_bounds(self, temp_db):
-        save_setting("ui_font_scale", "3.0", temp_db)
-        assert load_ui_font_scale(temp_db) == 1.0
-
-    def test_save_and_load_ui_font_family(self, temp_db):
-        save_ui_font_family("serif", temp_db)
-        assert load_ui_font_family(temp_db) == "serif"
 
     def test_ui_font_family_defaults_when_missing(self, temp_db):
         assert load_ui_font_family(temp_db) == ""

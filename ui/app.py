@@ -31,9 +31,9 @@ from ui.settings_panel import SettingsPanel
 from ui.sidebar import Sidebar
 from ui.translation_panel import TranslationPanel
 from ui.typography import clamp_font_scale, scale_control_fonts
+from ui.responsive import is_mobile_viewport
 
 
-_loading_from_history = False
 _active_mode = "grammar"
 
 
@@ -58,12 +58,14 @@ def main(page: ft.Page):
 
     set_default_model(default_model)
 
-    assessment_panel = AssessmentPanel(
-        on_assess_click=None, on_text_change=None, on_keyboard=None
-    )
+    assessment_panel = AssessmentPanel()
     practice_panel = PracticePanel()
     lesson_panel = LessonPanel()
     translation_panel = TranslationPanel()
+    translation_panel.bind_page(page)
+    assessment_panel.bind_page(page)
+    practice_panel.bind_page(page)
+    lesson_panel.bind_page(page)
     assessment_panel.set_languages(selected_languages)
     practice_panel.set_languages(selected_languages)
     lesson_panel.set_languages(selected_languages)
@@ -151,22 +153,16 @@ def main(page: ft.Page):
         page.update()
 
     def _new_assessment():
-        global _loading_from_history
         _switch_mode("grammar")
-        _loading_from_history = True
         assessment_panel.input_text = ""
         assessment_panel.clear_results()
-        _loading_from_history = False
         page.update()
 
     def _load_history(idx: int):
-        global _loading_from_history
         entry = store.get(idx)
-        _loading_from_history = True
         assessment_panel.input_text = entry.text
         assessment_panel.selected_language = entry.language
         assessment_panel.selected_formality = entry.formality
-        _loading_from_history = False
 
         verdict = entry.verdict
         if verdict == "yes":
@@ -178,13 +174,13 @@ def main(page: ft.Page):
         page.update()
 
     sidebar = Sidebar(
-        store, on_new=_new_assessment, on_load=_load_history, on_mode_change=_switch_mode
+        store,
+        on_new=_new_assessment,
+        on_load=_load_history,
+        on_mode_change=_switch_mode,
+        start_collapsed=is_mobile_viewport(page.width, page.height),
     )
-
-    def _on_text_change(e: ft.ControlEvent):
-        if not _loading_from_history:
-            assessment_panel.clear_results()
-            page.update()
+    sidebar.bind_page(page)
 
     assessment_service = AssessorService(store, assessment_panel, page)
     assessment_panel._assess_btn.on_click = assessment_service.on_assess

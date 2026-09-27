@@ -3,6 +3,18 @@
 import flet as ft
 
 from core.languages import DEFAULT_ENABLED_LANGUAGES
+from ui.controls import (
+    category_dropdown,
+    ects_dropdown,
+    formality_dropdown,
+    language_dropdown,
+    set_dropdown_languages,
+)
+from ui.responsive import (
+    responsive_container,
+    bind_responsive_container,
+    responsive_button_row,
+)
 
 
 class PracticePanel:
@@ -10,63 +22,18 @@ class PracticePanel:
 
     def __init__(self):
         # --- Language dropdown ---
-        self._lang_dropdown = ft.Dropdown(
-            label="Language",
-            width=250,
-            value="Serbian",
-            options=[ft.dropdown.Option(lang, lang) for lang in DEFAULT_ENABLED_LANGUAGES],
+        self._lang_dropdown = language_dropdown(
+            DEFAULT_ENABLED_LANGUAGES, width=250, value="Serbian"
         )
 
         # --- Formality dropdown ---
-        self._formality_dropdown = ft.Dropdown(
-            label="Formality",
-            width=150,
-            value="Colloquial",
-            options=[
-                ft.dropdown.Option("Colloquial", "Colloquial"),
-                ft.dropdown.Option("Business", "Business"),
-                ft.dropdown.Option("Formal", "Formal"),
-            ],
-        )
+        self._formality_dropdown = formality_dropdown(width=150)
 
         # --- Category dropdown ---
-        self._category_dropdown = ft.Dropdown(
-            label="Category",
-            width=350,
-            value="Everyday Conversation",
-            options=[
-                ft.dropdown.Option("Everyday Conversation", "Everyday Conversation"),
-                ft.dropdown.Option("Travel", "Travel"),
-                ft.dropdown.Option("Food and Dining", "Food and Dining"),
-                ft.dropdown.Option("Shopping", "Shopping"),
-                ft.dropdown.Option("Work and Business", "Work and Business"),
-                ft.dropdown.Option("School and Study", "School and Study"),
-                ft.dropdown.Option("Health and Medical", "Health and Medical"),
-                ft.dropdown.Option("Family and Relationships", "Family and Relationships"),
-                ft.dropdown.Option("Technology", "Technology"),
-                ft.dropdown.Option("News and Current Events", "News and Current Events"),
-                ft.dropdown.Option("Culture and Entertainment", "Culture and Entertainment"),
-                ft.dropdown.Option("Idioms and Expressions", "Idioms and Expressions"),
-                ft.dropdown.Option("Formal Writing", "Formal Writing"),
-                ft.dropdown.Option("Customer Service", "Customer Service"),
-                ft.dropdown.Option("Emergencies", "Emergencies"),
-            ],
-        )
+        self._category_dropdown = category_dropdown(width=350)
 
         # --- Generate controls ---
-        self._ects_dropdown = ft.Dropdown(
-            label="ECTS Level",
-            width=250,
-            value="A1",
-            options=[
-                ft.dropdown.Option("A1", "A1 - Beginner"),
-                ft.dropdown.Option("A2", "A2 - Elementary"),
-                ft.dropdown.Option("B1", "B1 - Intermediate"),
-                ft.dropdown.Option("B2", "B2 - Upper-Intermediate"),
-                ft.dropdown.Option("C1", "C1 - Advanced"),
-                ft.dropdown.Option("C2", "C2 - Proficient"),
-            ],
-        )
+        self._ects_dropdown = ects_dropdown(width=250)
         self._latinization_checkbox = ft.Checkbox(
             label="Latinization",
             value=False,
@@ -78,38 +45,46 @@ class PracticePanel:
         )
 
         # --- Source phrase display ---
-        self._source_box = ft.Container(
-            content=ft.Text(
-                "Click Generate to get a phrase.",
-                size=14,
-                italic=True,
-                color=ft.Colors.GREY,
+        self._source_box = responsive_container(
+            width_desktop=580,
+            width_tablet=520,
+            width_phone=None,
+            content=ft.Container(
+                content=ft.Text(
+                    "Click Generate to get a phrase.",
+                    size=14,
+                    italic=True,
+                    color=ft.Colors.GREY,
+                ),
+                border=ft.Border.all(1, ft.Colors.OUTLINE),
+                border_radius=5,
+                padding=ft.padding.Padding(left=12, top=10, right=12, bottom=10),
             ),
-            border=ft.Border.all(1, ft.Colors.OUTLINE),
-            border_radius=5,
-            padding=ft.padding.Padding(left=12, top=10, right=12, bottom=10),
-            width=580,
         )
         self._romanization_text = ft.Text(
             value="", size=13, selectable=True, color=ft.Colors.BLUE_200
         )
-        self._romanization_box = ft.Container(
-            content=ft.Column(
-                controls=[
-                    ft.Text(
-                        "Latinization",
-                        size=11,
-                        weight=ft.FontWeight.W_600,
-                        color=ft.Colors.GREY,
-                    ),
-                    self._romanization_text,
-                ],
-                spacing=3,
+        self._romanization_box = responsive_container(
+            width_desktop=580,
+            width_tablet=520,
+            width_phone=None,
+            content=ft.Container(
+                content=ft.Column(
+                    controls=[
+                        ft.Text(
+                            "Latinization",
+                            size=11,
+                            weight=ft.FontWeight.W_600,
+                            color=ft.Colors.GREY,
+                        ),
+                        self._romanization_text,
+                    ],
+                    spacing=3,
+                ),
+                border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
+                border_radius=5,
+                padding=ft.padding.Padding(left=12, top=8, right=12, bottom=8),
             ),
-            border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
-            border_radius=5,
-            padding=ft.padding.Padding(left=12, top=8, right=12, bottom=8),
-            width=580,
             visible=False,
         )
 
@@ -120,12 +95,17 @@ class PracticePanel:
             multiline=True,
             min_lines=4,
             max_lines=8,
-            width=580,
             text_size=14,
             border_color=ft.Colors.OUTLINE,
             focused_border_color=ft.Colors.PRIMARY,
             border_width=1.2,
             focused_border_width=1.8,
+        )
+        self._translation_input_container = responsive_container(
+            width_desktop=580,
+            width_tablet=520,
+            width_phone=None,
+            content=self._translation_input,
         )
 
         # --- Check/help buttons ---
@@ -170,38 +150,39 @@ class PracticePanel:
             spacing=2,
             scroll=ft.ScrollMode.AUTO,
         )
-        self._output_box = ft.Container(
-            content=self._output_column,
-            width=580,
-            height=140,
-            visible=False,
-            border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
-            border_radius=5,
-            padding=8,
+        self._output_box = responsive_container(
+            width_desktop=580,
+            width_tablet=520,
+            width_phone=None,
+            content=ft.Container(
+                content=self._output_column,
+                height=140,
+                visible=False,
+                border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
+                border_radius=5,
+                padding=8,
+            ),
         )
 
         self.view = ft.Column(
             controls=[
                 ft.Text("Practice Mode", size=20, weight=ft.FontWeight.W_600),
                 ft.Container(height=5),
-                ft.Row(
+                responsive_button_row(
                     controls=[
                         self._lang_dropdown,
                         self._formality_dropdown,
                         self._category_dropdown,
                     ],
-                    alignment=ft.MainAxisAlignment.START,
                     spacing=15,
-                    wrap=True,
                 ),
-                ft.Row(
+                responsive_button_row(
                     controls=[
                         self._ects_dropdown,
                         self._latinization_checkbox,
                         self._generate_btn,
                         self._generating_indicator,
                     ],
-                    alignment=ft.MainAxisAlignment.START,
                     spacing=15,
                 ),
                 ft.Container(height=10),
@@ -210,15 +191,14 @@ class PracticePanel:
                 self._source_box,
                 self._romanization_box,
                 ft.Container(height=10),
-                self._translation_input,
+                self._translation_input_container,
                 ft.Container(height=10),
-                ft.Row(
+                responsive_button_row(
                     controls=[
                         self._check_btn,
                         self._help_btn,
                         self._check_indicator,
                     ],
-                    alignment=ft.MainAxisAlignment.START,
                     spacing=10,
                 ),
                 ft.Container(height=8),
@@ -245,11 +225,6 @@ class PracticePanel:
     @property
     def selected_ects_level(self) -> str:
         return self._ects_dropdown.value or ""
-
-    @property
-    def selected_model(self) -> str:
-        # Model selection now comes from Settings (global default).
-        return ""
 
     @property
     def latinization_enabled(self) -> bool:
@@ -282,14 +257,14 @@ class PracticePanel:
 
     def set_languages(self, languages: list[str]) -> None:
         """Replace available languages and keep a valid selected value."""
-        current = self._lang_dropdown.value
-        self._lang_dropdown.options = [ft.dropdown.Option(lang, lang) for lang in languages]
-        if current in languages:
-            self._lang_dropdown.value = current
-        elif languages:
-            self._lang_dropdown.value = languages[0]
-        else:
-            self._lang_dropdown.value = None
+        set_dropdown_languages(self._lang_dropdown, languages)
+
+    def bind_page(self, page: ft.Page) -> None:
+        """Bind responsive containers to page resize events."""
+        bind_responsive_container(page, self._source_box)
+        bind_responsive_container(page, self._romanization_box)
+        bind_responsive_container(page, self._translation_input_container)
+        bind_responsive_container(page, self._output_box)
 
     @property
     def source_phrase(self) -> str:

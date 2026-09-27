@@ -2,19 +2,14 @@
 
 import asyncio
 
-from core.llm import check_translation, generate_practice_sentence
-
-
-def _phrase_text(phrase: tuple[str, ...]) -> str:
-    return phrase[0] if len(phrase) > 0 else ""
-
-
-def _phrase_reference(phrase: tuple[str, ...]) -> str:
-    return phrase[1] if len(phrase) > 1 else ""
-
-
-def _phrase_romanization(phrase: tuple[str, ...]) -> str:
-    return phrase[2] if len(phrase) > 2 else ""
+from core.llm import (
+    check_translation,
+    generate_practice_sentence,
+    get_default_model,
+    phrase_reference,
+    phrase_romanization,
+    phrase_text,
+)
 
 
 class PracticeService:
@@ -47,12 +42,12 @@ class PracticeService:
                 self._panel.selected_ects_level,
                 self._panel.selected_formality,
                 self._panel.selected_category,
-                self._panel.selected_model,
+                get_default_model() or "",
                 include_romanization=self._panel.latinization_enabled,
             )
-            phrase = _phrase_text(generated)
-            translation = _phrase_reference(generated)
-            romanization = _phrase_romanization(generated)
+            phrase = phrase_text(generated)
+            translation = phrase_reference(generated)
+            romanization = phrase_romanization(generated)
             self._help_translation = translation
             self._panel.set_source_phrase(phrase, romanization=romanization)
             self._page.update()
@@ -93,7 +88,7 @@ class PracticeService:
                 self._panel.selected_language,
                 self._panel.selected_formality,
                 self._panel.selected_ects_level,
-                self._panel.selected_model,
+                get_default_model() or "",
             )
             self._panel.show_mistakes(mistakes)
             self._page.update()

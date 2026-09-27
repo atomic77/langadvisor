@@ -8,19 +8,10 @@ from core.llm import (
     generate_practice_set,
     get_default_model,
     grade_practice_batch,
+    phrase_reference,
+    phrase_romanization,
+    phrase_text,
 )
-
-
-def _phrase_text(phrase: tuple[str, ...]) -> str:
-    return phrase[0] if len(phrase) > 0 else ""
-
-
-def _phrase_reference(phrase: tuple[str, ...]) -> str:
-    return phrase[1] if len(phrase) > 1 else ""
-
-
-def _phrase_romanization(phrase: tuple[str, ...]) -> str:
-    return phrase[2] if len(phrase) > 2 else ""
 
 
 class LessonService:
@@ -90,7 +81,7 @@ class LessonService:
                     model,
                     include_romanization=include_romanization,
                 )
-                single = _phrase_text(single_phrase)
+                single = phrase_text(single_phrase)
                 if single and not single.lower().startswith(("error", "cannot")):
                     phrases.append(single_phrase)
                 attempts += 1
@@ -120,9 +111,9 @@ class LessonService:
             self._panel.show_practicing(
                 self._current,
                 len(self._phrases),
-                _phrase_text(current_phrase),
-                romanization=_phrase_romanization(current_phrase),
-                reference_translation=_phrase_reference(current_phrase),
+                phrase_text(current_phrase),
+                romanization=phrase_romanization(current_phrase),
+                reference_translation=phrase_reference(current_phrase),
             )
             self._page.update()
         except asyncio.CancelledError:
@@ -147,10 +138,10 @@ class LessonService:
         self._panel.show_practicing(
             self._current,
             len(self._phrases),
-            _phrase_text(current_phrase),
+            phrase_text(current_phrase),
             answer=self._answers[self._current],
-            romanization=_phrase_romanization(current_phrase),
-            reference_translation=_phrase_reference(current_phrase),
+            romanization=phrase_romanization(current_phrase),
+            reference_translation=phrase_reference(current_phrase),
         )
         self._page.update()
 
@@ -166,10 +157,10 @@ class LessonService:
         self._panel.show_practicing(
             self._current,
             len(self._phrases),
-            _phrase_text(current_phrase),
+            phrase_text(current_phrase),
             answer=self._answers[self._current],
-            romanization=_phrase_romanization(current_phrase),
-            reference_translation=_phrase_reference(current_phrase),
+            romanization=phrase_romanization(current_phrase),
+            reference_translation=phrase_reference(current_phrase),
         )
         self._page.update()
 
@@ -177,7 +168,7 @@ class LessonService:
         if self._state != "practicing" or not self._phrases:
             return
         self._panel.show_reference_translation(
-            _phrase_reference(self._phrases[self._current])
+            phrase_reference(self._phrases[self._current])
         )
         self._page.update()
 
@@ -192,10 +183,10 @@ class LessonService:
         self._panel.show_practicing(
             self._current,
             len(self._phrases),
-            _phrase_text(current_phrase),
+            phrase_text(current_phrase),
             answer=self._answers[self._current],
-            romanization=_phrase_romanization(current_phrase),
-            reference_translation=_phrase_reference(current_phrase),
+            romanization=phrase_romanization(current_phrase),
+            reference_translation=phrase_reference(current_phrase),
         )
         self._page.update()
 
@@ -215,7 +206,7 @@ class LessonService:
 
         model = get_default_model() or ""
         items = [
-            (_phrase_text(phrase), self._answers[i] or "", _phrase_reference(phrase))
+            (phrase_text(phrase), self._answers[i] or "", phrase_reference(phrase))
             for i, phrase in enumerate(self._phrases)
         ]
 
@@ -229,7 +220,7 @@ class LessonService:
                 model,
             )
             for result, phrase in zip(results, self._phrases):
-                romanization = _phrase_romanization(phrase)
+                romanization = phrase_romanization(phrase)
                 if romanization:
                     result["romanization"] = romanization
             self._last_results = results

@@ -32,8 +32,7 @@ class AssessorService:
         self._panel.clear_results()
         self._page.update()
 
-        selected_model = self._panel.selected_model
-        effective_model = selected_model or (get_default_model() or "")
+        model = get_default_model() or ""
 
         self._running_task = asyncio.current_task()
         try:
@@ -41,7 +40,7 @@ class AssessorService:
                 text,
                 self._panel.selected_language,
                 self._panel.selected_formality,
-                selected_model,
+                model,
             )
 
             if verdict in ("yes", "no"):
@@ -58,7 +57,7 @@ class AssessorService:
                     text=text,
                     language=self._panel.selected_language,
                     formality=self._panel.selected_formality,
-                    model=effective_model,
+                    model=model,
                     verdict=verdict,
                     feedback=feedback,
                     suggestion=suggestion,

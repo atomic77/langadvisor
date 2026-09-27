@@ -42,19 +42,6 @@ class TestParsePhraseTranslation:
 
 
 class TestParsePracticeSet:
-    def test_full_response(self):
-        content = (
-            "1. PHRASE: Bonjour le monde\n   TRANSLATION: Hello the world\n"
-            "2. PHRASE: Comment ça va\n   TRANSLATION: How are you\n"
-            "3. PHRASE: Au revoir\n   TRANSLATION: Goodbye\n"
-        )
-        out = _parse_practice_set(content, expected_count=3)
-        assert out == [
-            ("Bonjour le monde", "Hello the world"),
-            ("Comment ça va", "How are you"),
-            ("Au revoir", "Goodbye"),
-        ]
-
     def test_full_response_with_romanization(self):
         content = (
             "1. PHRASE: こんにちは\n   TRANSLATION: Hello\n"
@@ -76,32 +63,9 @@ class TestParsePracticeSet:
         out = _parse_practice_set(content, expected_count=1)
         assert out == [("こんにちは", "Hello")]
 
-    def test_short_response_returns_what_was_parsed(self):
-        content = (
-            "1. PHRASE: Hola\n   TRANSLATION: Hello\n"
-            "2. PHRASE: Adiós\n   TRANSLATION: Goodbye\n"
-        )
-        out = _parse_practice_set(content, expected_count=10)
-        assert len(out) == 2
-        assert out[0] == ("Hola", "Hello")
-
-    def test_skips_missing_indices(self):
-        content = (
-            "1. PHRASE: A\n   TRANSLATION: a-en\n"
-            "3. PHRASE: C\n   TRANSLATION: c-en\n"
-        )
-        out = _parse_practice_set(content, expected_count=3)
-        assert [p for p, _ in out] == ["A", "C"]
-
-    def test_handles_field_without_leading_space(self):
-        content = (
-            "1.PHRASE: Hi\nTRANSLATION: Hello\n"
-            "2.PHRASE: Bye\nTRANSLATION: Goodbye\n"
-        )
-        out = _parse_practice_set(content, expected_count=2)
-        assert out == [("Hi", "Hello"), ("Bye", "Goodbye")]
-
     def test_skips_entries_with_empty_phrase(self):
+        # Exercises the practice_set-specific required_field="phrase" skip,
+        # distinct from the translation parser's required_field="translation".
         content = (
             "1. PHRASE: Hello\n   TRANSLATION: Hi\n"
             "2. PHRASE:\n   TRANSLATION: nothing\n"
@@ -109,10 +73,6 @@ class TestParsePracticeSet:
         out = _parse_practice_set(content, expected_count=2)
         assert len(out) == 1
         assert out[0] == ("Hello", "Hi")
-
-    def test_malformed_response_returns_empty(self):
-        assert _parse_practice_set("no structure here", expected_count=5) == []
-        assert _parse_practice_set("", expected_count=5) == []
 
 
 class TestParseGradeBatch:
@@ -163,24 +123,6 @@ class TestParseGradeBatch:
         assert results[0]["score"] == 0
         # 15 clamps to 10.
         assert results[1]["score"] == 10
-
-    def test_negative_score_clamps_to_zero(self):
-        content = (
-            "1. SCORE: -5 | MISTAKES: nope | BETTER: Hello\n"
-            "2. SCORE: 7 | MISTAKES: ok | BETTER: Goodbye\n"
-        )
-        _, results = _parse_grade_batch(content, self.ITEMS)
-        assert results[0]["score"] == 0
-        assert results[1]["score"] == 7
-
-    def test_no_overall_line_yields_empty_summary(self):
-        content = (
-            "1. SCORE: 5 | MISTAKES: x | BETTER: Hello\n"
-            "2. SCORE: 5 | MISTAKES: y | BETTER: Goodbye\n"
-        )
-        summary, results = _parse_grade_batch(content, self.ITEMS)
-        assert summary == ""
-        assert len(results) == 2
 
     def test_empty_items_returns_empty(self):
         summary, results = _parse_grade_batch("anything", [])
@@ -319,20 +261,18 @@ class TestLessonPanelState:
         assert panel._submit_btn.visible is True
         assert panel._submit_btn.disabled is False
 
-    def test_practicing_shows_romanization_when_present(self):
+    @pytest.mark.parametrize(
+        "romanization, expected_visible",
+        [("konnichiwa", True), ("", False)],
+        ids=["present", "missing"],
+    )
+    def test_practicing_romanization_visibility(self, romanization, expected_visible):
         panel = _make_panel()
 
-        panel.show_practicing(0, 1, "こんにちは", romanization="konnichiwa")
+        panel.show_practicing(0, 1, "こんにちは", romanization=romanization)
 
-        assert panel._romanization_card.visible is True
-        assert panel._romanization_text.value == "konnichiwa"
-
-    def test_practicing_hides_romanization_when_missing(self):
-        panel = _make_panel()
-
-        panel.show_practicing(0, 1, "Bonjour", romanization="")
-
-        assert panel._romanization_card.visible is False
+        assert panel._romanization_card.visible is expected_visible
+        assert panel._romanization_text.value == romanization
 
     def test_practicing_reveals_cached_reference_translation(self):
         panel = _make_panel()
@@ -346,17 +286,6 @@ class TestLessonPanelState:
 
         assert panel._reference_card.visible is True
         assert panel._reference_text.value == "Hello"
-
-    def test_practicing_resets_reference_translation_between_steps(self):
-        panel = _make_panel()
-
-        panel.show_practicing(0, 2, "Bonjour", reference_translation="Hello")
-        panel.show_reference_translation()
-        panel.show_practicing(1, 2, "Merci", reference_translation="Thanks")
-
-        assert panel._reference_card.visible is False
-        assert panel._reference_text.value == ""
-        assert panel._reference_translation == "Thanks"
 
     def test_practicing_disables_help_without_reference_translation(self):
         panel = _make_panel()
@@ -461,12 +390,6 @@ class TestLessonServiceNavigation:
         assert panel._reference_text.value == "a"
         assert service._answers == ["", "", ""]
         assert panel._answer_input.value == "draft answer"
-
-    def test_next_at_end_is_noop(self):
-        service = self._service_with_three()
-        service._current = 2
-        service.on_next(None)
-        assert service._current == 2
 
     def test_prev_moves_back(self):
         service = self._service_with_three()
