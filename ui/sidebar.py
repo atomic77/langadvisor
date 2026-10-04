@@ -88,6 +88,12 @@ class Sidebar:
                         on_click=lambda e: self._set_mode("translation"),
                     ),
                     ft.IconButton(
+                        icon=ft.icons.Icons.ANALYTICS,
+                        icon_size=22,
+                        tooltip="Morpheme Analysis",
+                        on_click=lambda e: self._set_mode("morphemes"),
+                    ),
+                    ft.IconButton(
                         icon=ft.icons.Icons.SETTINGS,
                         icon_size=22,
                         tooltip="Settings",
@@ -146,6 +152,12 @@ class Sidebar:
                 [ft.Icon(ft.icons.Icons.TRANSLATE, size=16), ft.Text("Translation", size=13)]
             ),
             on_click=lambda e: self._set_mode("translation"),
+        )
+        self._morphemes_link = ft.TextButton(
+            content=ft.Row(
+                [ft.Icon(ft.icons.Icons.ANALYTICS, size=16), ft.Text("Morphemes", size=13)]
+            ),
+            on_click=lambda e: self._set_mode("morphemes"),
         )
         self._settings_link = ft.TextButton(
             content=ft.Row(
@@ -216,6 +228,7 @@ class Sidebar:
                     self._practice_link,
                     self._lesson_link,
                     self._translation_link,
+                    self._morphemes_link,
                     self._settings_link,
                     search_btn,
                     self._search_input,

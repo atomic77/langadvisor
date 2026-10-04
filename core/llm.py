@@ -677,3 +677,96 @@ def _parse_grade_batch(
                 "better": r["better"],
             })
     return summary, out
+
+
+async def analyze_morphemes(
+    text: str,
+    language: str,
+    model: str,
+) -> list[dict]:
+    """Analyze text morpheme-by-morpheme.
+
+    Returns a list of dicts with keys:
+    - morpheme: the morpheme in the original script
+    - gloss: linguistic gloss (e.g., "NOM.SG", "PAST.3SG")
+    - meaning: nearest English equivalent / lexical meaning
+    - romanization: optional latinization for non-Latin scripts
+
+    Also returns natural English translations as a separate list.
+    """
+    if not text.strip() or not language:
+        return {"morphemes": [], "translations": []}
+
+    llm = get_llm(model)
+    messages = [
+        (
+            "system",
+            f"You are a linguistic morphologist specializing in {language}. "
+            f"Analyze the user's text morpheme-by-morpheme. "
+            "For each morpheme, provide:\n"
+            "1. MORPHEME: the morpheme in the original script\n"
+            "2. GLOSS: linguistic gloss using standard abbreviations (e.g., NOM.SG, PAST.3SG, DEF.ART, PL)\n"
+            "3. MEANING: nearest English equivalent or lexical meaning\n"
+            "4. ROMANIZATION: standard romanization/latinization (leave blank if already Latin script)\n\n"
+            "Then provide 2-3 natural English translations of the full text.\n\n"
+            "Format your response exactly as:\n"
+            "MORPHEMES:\n"
+            "1. MORPHEME: <morpheme> | GLOSS: <gloss> | MEANING: <meaning> | ROMANIZATION: <romanization>\n"
+            "2. MORPHEME: <morpheme> | GLOSS: <gloss> | MEANING: <meaning> | ROMANIZATION: <romanization>\n"
+            "...\n"
+            "TRANSLATIONS:\n"
+            "1. <natural English translation>\n"
+            "2. <natural English translation>\n"
+            "3. <natural English translation>\n\n"
+            "Do not add any commentary before or after.",
+        ),
+        ("human", text),
+    ]
+    try:
+        result = await llm.ainvoke(messages)
+        content = result.content.strip()
+        return _parse_morpheme_analysis(content)
+    except ConnectError:
+        return {"morphemes": [], "translations": [], "error": "Cannot connect to Ollama."}
+    except Exception as e:
+        return {"morphemes": [], "translations": [], "error": f"Error: {e}"}
+
+
+def _parse_morpheme_analysis(content: str) -> dict:
+    """Parse morpheme analysis and translations from model output."""
+    morphemes = []
+    translations = []
+    error = None
+
+    # Split into MORPHEMES and TRANSLATIONS sections
+    sections = content.split("TRANSLATIONS:")
+    morphemes_section = sections[0] if sections else content
+    translations_section = sections[1] if len(sections) > 1 else ""
+
+    # Parse morphemes
+    import re
+    morpheme_pattern = re.compile(
+        r"^\s*(\d+)\.\s*MORPHEME\s*:\s*([^|]+?)\s*\|\s*GLOSS\s*:\s*([^|]+?)\s*\|\s*MEANING\s*:\s*([^|]+?)\s*\|\s*ROMANIZATION\s*:\s*(.*)$",
+        re.IGNORECASE,
+    )
+    for line in morphemes_section.splitlines():
+        m = morpheme_pattern.match(line)
+        if m:
+            morphemes.append({
+                "morpheme": m.group(2).strip(),
+                "gloss": m.group(3).strip(),
+                "meaning": m.group(4).strip(),
+                "romanization": m.group(5).strip(),
+            })
+
+    # Parse translations
+    trans_pattern = re.compile(r"^\s*(\d+)\.\s*(.+)$")
+    for line in translations_section.splitlines():
+        m = trans_pattern.match(line)
+        if m:
+            translations.append(m.group(2).strip())
+
+    if not morphemes and "error" in content.lower():
+        error = content.strip()
+
+    return {"morphemes": morphemes, "translations": translations, "error": error}
