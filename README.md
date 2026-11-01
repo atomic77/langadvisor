@@ -1,5 +1,9 @@
 # LangAdvisor
 
+
+> [!NOTE]  
+> This repository has been archived and rewritten as a native golang-based webapp at https://github.com/atomic77/langadvisor-go . 
+
 A desktop GUI or web application providing a fun toolkit for polyglots out there, including grammar assessment, practice and translation. Leverages local LLMs via [Ollama](https://docs.ollama.com/) for enhanced privacy, or cloud
 LLMs via [Ollama Cloud](https://docs.ollama.com/cloud) service. See the Models section below for details on what available models work best. 
 
